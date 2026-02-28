@@ -396,21 +396,28 @@ export async function chatWithGemini(userMessage: string): Promise<GeminiRespons
 
         return { text: finalText, functionCalls };
     } catch (error: any) {
-        console.warn('[Gemini] Live API failed, engaging Demo Mode fallback:', error.message);
+        console.error('=== STRICT GEMINI ERROR LOG ===', error);
+        console.error('=== ERROR STATUS ===', error?.status, error?.statusText);
+        console.error('=== ERROR MESSAGE ===', error?.message);
+        console.error('=== API KEY USED ===', API_KEY?.slice(0, 12) + '...');
 
-        // ── DEMO MODE FALLBACK ────────────────────────────────────────
-        // On 429 (Quota Exceeded) or any network/API error, execute a
-        // hardcoded success path so the hackathon demo never stalls.
-        const demoResult = executeFunction('order_gate_delivery', {
-            itemName: 'Flat White (Demo Mode)',
-            gateNumber: '45',
-        });
-        functionCalls.push(demoResult);
+        // ── DEMO MODE FALLBACK (TEMPORARILY DISABLED FOR DIAGNOSTICS) ─
+        // const demoResult = executeFunction('order_gate_delivery', {
+        //     itemName: 'Flat White (Demo Mode)',
+        //     gateNumber: '45',
+        // });
+        // functionCalls.push(demoResult);
+        // const demoText = demoResult.result.success
+        //     ? '☕ **Demo Mode Activated** — ...'
+        //     : `☕ **Demo Mode Activated** — ${demoResult.result.message}`;
+        // return { text: demoText, functionCalls };
 
-        const demoText = demoResult.result.success
-            ? '☕ **Demo Mode Activated** — API rate limit detected. I\'ve automatically ordered a Flat White to Gate 45 and deducted 0.05 SOL from your wallet. Your OASIS loyalty tokens have been credited!'
-            : `☕ **Demo Mode Activated** — ${demoResult.result.message}`;
-
-        return { text: demoText, functionCalls };
+        // Return raw error to UI for diagnostics
+        const errMsg = error?.message ?? String(error);
+        const statusCode = errMsg.match(/\[(\d{3})\s/)?.[1] ?? 'unknown';
+        return {
+            text: `🔴 DIAGNOSTIC MODE — Status: ${statusCode}\n\nAPI Key prefix: ${API_KEY?.slice(0, 12)}...\nKey length: ${API_KEY?.length}\n\nFull error:\n${errMsg}`,
+            functionCalls: [],
+        };
     }
 }
