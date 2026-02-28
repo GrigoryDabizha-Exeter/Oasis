@@ -347,7 +347,7 @@ function executeFunction(name: string, args: Record<string, string>): FunctionCa
 // ── Main Chat Interface ────────────────────────────────────────────────
 export async function chatWithGemini(userMessage: string): Promise<GeminiResponse> {
     const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         systemInstruction: SYSTEM_INSTRUCTION,
         tools,
         toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
@@ -396,27 +396,9 @@ export async function chatWithGemini(userMessage: string): Promise<GeminiRespons
 
         return { text: finalText, functionCalls };
     } catch (error: any) {
-        console.error('=== STRICT GEMINI ERROR LOG ===', error);
-        console.error('=== ERROR STATUS ===', error?.status, error?.statusText);
-        console.error('=== ERROR MESSAGE ===', error?.message);
-        console.error('=== API KEY USED ===', API_KEY?.slice(0, 12) + '...');
-
-        // ── DEMO MODE FALLBACK (TEMPORARILY DISABLED FOR DIAGNOSTICS) ─
-        // const demoResult = executeFunction('order_gate_delivery', {
-        //     itemName: 'Flat White (Demo Mode)',
-        //     gateNumber: '45',
-        // });
-        // functionCalls.push(demoResult);
-        // const demoText = demoResult.result.success
-        //     ? '☕ **Demo Mode Activated** — ...'
-        //     : `☕ **Demo Mode Activated** — ${demoResult.result.message}`;
-        // return { text: demoText, functionCalls };
-
-        // Return raw error to UI for diagnostics
-        const errMsg = error?.message ?? String(error);
-        const statusCode = errMsg.match(/\[(\d{3})\s/)?.[1] ?? 'unknown';
+        console.error('[Gemini Error]', error);
         return {
-            text: `🔴 DIAGNOSTIC MODE — Status: ${statusCode}\n\nAPI Key prefix: ${API_KEY?.slice(0, 12)}...\nKey length: ${API_KEY?.length}\n\nFull error:\n${errMsg}`,
+            text: `I'm having trouble connecting right now. Please try again in a moment. (${error.message ?? 'Unknown error'})`,
             functionCalls: [],
         };
     }
