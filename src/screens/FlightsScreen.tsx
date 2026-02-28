@@ -11,7 +11,10 @@ import {
 import FlightCard from '../components/flights/FlightCard';
 import QueueCard from '../components/queues/QueueCard';
 import GlassCard from '../components/ui/GlassCard';
+import HeroFlightCard from '../components/ui/HeroFlightCard';
 import HeroSearchConcierge from '../components/ui/HeroSearchConcierge';
+import PinUnlockModal from '../components/ui/PinUnlockModal';
+import RobotTrackerCard from '../components/ui/RobotTrackerCard';
 import { generateMockArrivals, generateMockDepartures } from '../services/flightApi';
 import { generateMockQueues } from '../services/queueApi';
 import { useFlightStore } from '../stores/useFlightStore';
@@ -22,6 +25,7 @@ export default function FlightsScreen() {
     const { queues, setQueues } = useQueueStore();
     const [refreshing, setRefreshing] = useState(false);
     const [showQueues, setShowQueues] = useState(false);
+    const [pinModalVisible, setPinModalVisible] = useState(false);
 
     const loadData = useCallback(() => {
         setDepartures(generateMockDepartures(20));
@@ -45,12 +49,18 @@ export default function FlightsScreen() {
 
     const renderHeader = () => (
         <View style={styles.headerContainer}>
+            {/* Hero Flight Card (user's flight) */}
+            <HeroFlightCard />
+
             {/* Hero */}
             <View style={styles.hero}>
                 <Text style={styles.heroLabel}>LONDON GATWICK</Text>
                 <Text style={styles.heroTitle}>Oasis</Text>
                 <Text style={styles.heroSubtitle}>Your journey starts here</Text>
             </View>
+
+            {/* Droid Delivery Tracker */}
+            <RobotTrackerCard onPinPress={() => setPinModalVisible(true)} />
 
             {/* AI Concierge Search */}
             <HeroSearchConcierge />
@@ -151,6 +161,7 @@ export default function FlightsScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00A0B2" />}
                 initialNumToRender={8}
             />
+            <PinUnlockModal visible={pinModalVisible} onClose={() => setPinModalVisible(false)} />
         </SafeAreaView>
     );
 }

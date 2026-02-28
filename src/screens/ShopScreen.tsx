@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import ShopItemCard from '../components/shop/ShopItemCard';
 import GlassCard from '../components/ui/GlassCard';
+import PinUnlockModal from '../components/ui/PinUnlockModal';
+import RobotTrackerCard from '../components/ui/RobotTrackerCard';
 import { useSolana } from '../providers/SolanaProvider';
 import { MOCK_SHOP_ITEMS, calculateLoyaltyReward } from '../services/shopService';
 import { ShopItem } from '../services/types';
@@ -19,6 +21,7 @@ type Category = 'all' | 'duty-free' | 'food' | 'lounge' | 'service';
 
 export default function ShopScreen() {
     const [category, setCategory] = useState<Category>('all');
+    const [pinModalVisible, setPinModalVisible] = useState(false);
     const { connected, signTransaction } = useSolana();
     const { balance, setBalance, loyaltyTokens, setLoyaltyTokens } = useWalletStore();
 
@@ -75,6 +78,9 @@ export default function ShopScreen() {
                 <Text style={styles.subtitle}>Pay with SOL • Earn OASIS rewards</Text>
             </View>
 
+            {/* Droid Delivery Tracker */}
+            <RobotTrackerCard onPinPress={() => setPinModalVisible(true)} />
+
             {/* Tip Porter Banner */}
             <GlassCard elevated highlight style={styles.tipBanner}>
                 <View style={styles.tipRow}>
@@ -122,6 +128,7 @@ export default function ShopScreen() {
                 ListHeaderComponent={renderHeader}
                 contentContainerStyle={styles.listContent}
             />
+            <PinUnlockModal visible={pinModalVisible} onClose={() => setPinModalVisible(false)} />
         </SafeAreaView>
     );
 }

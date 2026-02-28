@@ -25,9 +25,9 @@ export default function RoleSelectionScreen() {
         },
         {
             key: 'runner',
-            emoji: '🏃',
-            title: 'I am an Oasis Runner',
-            subtitle: 'Accept orders · Deliver to gates · Earn rewards',
+            emoji: '🏪',
+            title: 'I am a Shop Partner',
+            subtitle: 'Manage orders · Dispatch droids · Serve passengers',
             accent: '#9945FF',
         },
     ];

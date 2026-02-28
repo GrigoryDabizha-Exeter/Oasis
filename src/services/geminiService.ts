@@ -208,15 +208,26 @@ function executeOrderGateDelivery(args: { itemName: string; gateNumber: string }
     walletStore.setBalance(parseFloat(newBalance.toFixed(4)));
     walletStore.setLoyaltyTokens(walletStore.loyaltyTokens + loyaltyEarned);
 
+    // Trigger droid delivery pipeline
+    const { useOrderStore } = require('../stores/useOrderStore');
+    const { useAuthStore } = require('../stores/useAuthStore');
+    const orderStore = useOrderStore.getState();
+    const authUser = useAuthStore.getState().user;
+    const shopSource = (purchaseItem as any).shopName ?? 'Gatwick Café';
+    orderStore.placeOrder(purchaseItem.name, gateNumber, purchaseItem.price, shopSource, authUser?.name ?? 'Passenger');
+    const pin = useOrderStore.getState().activeOrder?.pin ?? '----';
+
     return {
         success: true,
-        message: `✅ Ordered ${purchaseItem.name} for ${purchaseItem.price} SOL — delivering to ${gateNumber}. Earned ${loyaltyEarned} OASIS tokens!`,
+        message: `✅ Ordered ${purchaseItem.name} for ${purchaseItem.price} SOL — OASIS Droid dispatched to Gate ${gateNumber}! 🤖 Your unlock PIN: ${pin}. Earned ${loyaltyEarned} OASIS tokens!`,
         data: {
             item: purchaseItem.name,
             price: purchaseItem.price,
             gate: gateNumber,
             loyaltyEarned,
             newBalance: parseFloat(newBalance.toFixed(4)),
+            pin,
+            droidDelivery: true,
             txSignature: `mock_${Date.now().toString(36)}`,
         },
     };
