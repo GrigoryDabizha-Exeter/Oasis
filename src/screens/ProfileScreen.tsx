@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import React from 'react';
 import {
     Alert,
@@ -12,8 +14,8 @@ import {
 import GlassCard from '../components/ui/GlassCard';
 import { useSolana } from '../providers/SolanaProvider';
 import { useAuthStore } from '../stores/useAuthStore';
-import { FontSize, useSettingsStore } from '../stores/useSettingsStore';
 import { useFlightStore } from '../stores/useFlightStore';
+import { FontSize, useSettingsStore } from '../stores/useSettingsStore';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getInitials(name: string): string {
@@ -107,17 +109,17 @@ export default function ProfileScreen() {
     function handleClearCache() {
         Alert.alert(
             'Clear App Cache',
-            'This will reset all cached flight and queue data. Your account and settings are unaffected.',
+            'This will clear all cached data and saved preferences. The app will need to reload your settings.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Clear',
                     style: 'destructive',
-                    onPress: () => {
-                        // Reset volatile data stores
+                    onPress: async () => {
+                        await AsyncStorage.clear();
                         useFlightStore.getState().setDepartures([]);
                         useFlightStore.getState().setArrivals([]);
-                        Alert.alert('Done', 'Cache cleared. Pull to refresh on the Flights tab.');
+                        Alert.alert('Done', 'Cache cleared. Please restart the app for settings to take effect.');
                     },
                 },
             ]
@@ -218,6 +220,23 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                 </GlassCard>
 
+                {/* ── Demo Tools ── */}
+                <Text style={styles.sectionTitle}>Demo Tools</Text>
+                <GlassCard style={styles.settingsCard}>
+                    <TouchableOpacity
+                        style={styles.settingRow}
+                        onPress={() => router.push('/partner')}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.settingIcon}>🏪</Text>
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingName}>Switch to Merchant Portal</Text>
+                            <Text style={styles.settingSubtext}>Partner dashboard &amp; live order queue</Text>
+                        </View>
+                        <Text style={styles.chevron}>→</Text>
+                    </TouchableOpacity>
+                </GlassCard>
+
                 {/* ── Credits ── */}
                 <Text style={styles.sectionTitle}>Credits</Text>
                 <GlassCard style={styles.aboutCard}>
@@ -258,47 +277,47 @@ export default function ProfileScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#111111' },
+    container: { flex: 1, backgroundColor: '#000000' },
     scrollContent: { paddingBottom: 100 },
 
     // Header
     header: { paddingHorizontal: 16, paddingTop: 24, marginBottom: 20 },
-    label: { color: '#00A0B2', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 4 },
+    label: { color: '#888888', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 4 },
     title: { color: '#FFFFFF', fontSize: 36, fontWeight: '800', letterSpacing: -1 },
 
     // Profile card
     profileCard: { marginHorizontal: 16, marginBottom: 28 },
     avatarRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
     avatar: {
-        width: 56, height: 56, borderRadius: 28,
-        backgroundColor: 'rgba(0, 160, 178, 0.15)',
+        width: 56, height: 56, borderRadius: 28,   // keep circular
+        backgroundColor: '#1A1A1A',
         alignItems: 'center', justifyContent: 'center',
-        borderWidth: 2, borderColor: 'rgba(0, 160, 178, 0.35)',
+        borderWidth: 2, borderColor: '#FFFFFF',
         flexShrink: 0,
     },
-    avatarText: { color: '#00A0B2', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
+    avatarText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
     userInfo: { flex: 1 },
     userName: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginBottom: 3 },
-    userEmail: { color: 'rgba(255,255,255,0.45)', fontSize: 12, marginBottom: 8 },
+    userEmail: { color: '#666666', fontSize: 12, marginBottom: 8 },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
     metaChip: {
         paddingHorizontal: 7, paddingVertical: 2,
-        borderRadius: 6,
-        backgroundColor: 'rgba(255,255,255,0.07)',
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 0,
+        backgroundColor: '#1A1A1A',
+        borderWidth: 1, borderColor: '#333333',
     },
     metaChipCyan: {
-        backgroundColor: 'rgba(0,160,178,0.1)',
-        borderColor: 'rgba(0,160,178,0.25)',
+        backgroundColor: '#1A1A1A',
+        borderColor: '#FFFFFF',
     },
-    metaChipText: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '600' },
-    metaChipTextCyan: { color: '#00A0B2' },
-    metaValue: { color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: '500' },
+    metaChipText: { color: '#888888', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+    metaChipTextCyan: { color: '#FFFFFF' },
+    metaValue: { color: '#888888', fontSize: 12, fontWeight: '500' },
 
     // Section headers
     sectionTitle: {
-        color: '#FFFFFF', fontSize: 17, fontWeight: '700',
-        paddingHorizontal: 16, marginBottom: 10,
+        color: '#FFFFFF', fontSize: 11, fontWeight: '800',
+        letterSpacing: 2, paddingHorizontal: 16, marginBottom: 10,
     },
     dangerTitle: { color: '#EF4444' },
 
@@ -311,46 +330,47 @@ const styles = StyleSheet.create({
     settingIcon: { fontSize: 20, width: 28, textAlign: 'center' },
     settingInfo: { flex: 1 },
     settingName: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
-    settingSubtext: { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 2 },
-    settingDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginVertical: 2 },
+    settingSubtext: { color: '#555555', fontSize: 12, marginTop: 2 },
+    settingDivider: { height: 1, backgroundColor: '#2A2A2A', marginVertical: 2 },
 
     valuePill: {
         paddingHorizontal: 10, paddingVertical: 4,
-        borderRadius: 8,
-        backgroundColor: 'rgba(0,160,178,0.1)',
-        borderWidth: 1, borderColor: 'rgba(0,160,178,0.25)',
+        borderRadius: 0,
+        backgroundColor: '#1A1A1A',
+        borderWidth: 1, borderColor: '#FFFFFF',
     },
-    valuePillText: { color: '#00A0B2', fontSize: 12, fontWeight: '600' },
+    valuePillText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
 
     logoutText: { color: '#EF4444' },
 
     // Danger zone
     dangerCard: {
         marginHorizontal: 16, marginBottom: 28,
-        borderColor: 'rgba(239,68,68,0.2)',
+        borderColor: '#EF4444',
     },
     dangerText: { color: '#EF4444' },
 
     // Credits / About
     aboutCard: { marginHorizontal: 16, marginBottom: 24 },
-    aboutTitle: { color: '#00A0B2', fontSize: 22, fontWeight: '800', marginBottom: 4 },
-    aboutVersion: { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginBottom: 10 },
-    aboutDesc: { color: 'rgba(255,255,255,0.55)', fontSize: 14, lineHeight: 20, marginBottom: 18 },
-    techStack: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 14 },
+    aboutTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', marginBottom: 4 },
+    aboutVersion: { color: '#555555', fontSize: 12, marginBottom: 10 },
+    aboutDesc: { color: '#666666', fontSize: 14, lineHeight: 20, marginBottom: 18 },
+    techStack: { borderTopWidth: 1, borderTopColor: '#2A2A2A', paddingTop: 14 },
     techLabel: {
-        color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '700',
-        letterSpacing: 1.2, marginBottom: 10, textTransform: 'uppercase',
+        color: '#555555', fontSize: 10, fontWeight: '700',
+        letterSpacing: 1.5, marginBottom: 10, textTransform: 'uppercase',
     },
     techGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     techChip: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        backgroundColor: '#1A1A1A',
         paddingHorizontal: 10, paddingVertical: 5,
-        borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 0, borderWidth: 1, borderColor: '#2A2A2A',
     },
-    techText: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '500' },
+    techText: { color: '#666666', fontSize: 11, fontWeight: '500' },
 
     // Footer
     footer: { alignItems: 'center', paddingVertical: 24 },
-    footerText: { color: 'rgba(255,255,255,0.25)', fontSize: 13 },
-    footerSub: { color: 'rgba(255,255,255,0.12)', fontSize: 11, marginTop: 4 },
+    chevron: { color: '#444444', fontSize: 18, fontWeight: '300' },
+    footerText: { color: '#444444', fontSize: 13 },
+    footerSub: { color: '#333333', fontSize: 11, marginTop: 4 },
 });

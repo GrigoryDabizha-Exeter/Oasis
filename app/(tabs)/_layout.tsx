@@ -18,18 +18,15 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: 'rgba(17, 17, 17, 0.95)',
+          backgroundColor: '#000000',
           borderTopWidth: 1,
-          borderTopColor: 'rgba(255, 255, 255, 0.06)',
+          borderTopColor: '#2A2A2A',
           height: Platform.OS === 'ios' ? 88 : 64,
           paddingBottom: Platform.OS === 'ios' ? 28 : 8,
           paddingTop: 8,
-          ...(Platform.OS === 'web' ? {
-            backdropFilter: 'blur(40px)',
-          } : {}),
         },
-        tabBarActiveTintColor: '#00A0B2',
-        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.35)',
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: '#555555',
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
@@ -65,13 +62,6 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => (
             <ShopTabIcon focused={focused} hasPendingOrder={!!hasPendingOrder} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="lounge"
-        options={{
-          title: 'Lounge',
-          tabBarIcon: ({ focused }) => <TabDot focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -132,14 +122,10 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   dotActive: {
-    backgroundColor: '#00A0B2',
-    shadowColor: '#00A0B2',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
+    backgroundColor: '#FFFFFF',
   },
   dotInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#444444',
   },
   shopIconWrapper: {
     alignItems: 'center',
@@ -153,9 +139,5 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 3.5,
     backgroundColor: '#EF4444',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
   },
 });

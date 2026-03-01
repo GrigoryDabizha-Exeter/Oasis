@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Platform, StyleSheet, View, ViewProps } from 'react-native';
+import { StyleSheet, View, ViewProps } from 'react-native';
 import Animated, {
     Easing,
     useAnimatedStyle,
@@ -49,32 +49,21 @@ export default function GlassCard({ children, elevated, highlight, style, classN
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: '#111111',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: 20,
+        borderColor: '#2A2A2A',
+        borderRadius: 0,
         padding: 16,
         overflow: 'hidden',
-        ...(Platform.OS === 'web'
-            ? { backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }
-            : {}),
     },
     elevated: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 32,
-        elevation: 8,
+        backgroundColor: '#1A1A1A',
+        borderColor: '#333333',
+        elevation: 2,
     },
     highlight: {
-        borderColor: 'rgba(0, 160, 178, 0.3)',
-        shadowColor: '#00A0B2',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 20,
-        elevation: 4,
+        borderColor: '#FFFFFF',
+        elevation: 2,
     },
     innerGlow: {
         position: 'absolute',
@@ -82,6 +71,6 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 1,
-        backgroundColor: 'rgba(0, 160, 178, 0.3)',
+        backgroundColor: '#FFFFFF',
     },
 });

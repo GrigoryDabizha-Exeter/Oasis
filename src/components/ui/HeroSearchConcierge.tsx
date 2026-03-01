@@ -3,6 +3,7 @@ import {
     Animated,
     Easing,
     Keyboard,
+    KeyboardAvoidingView,
     Modal,
     Platform,
     Pressable,
@@ -11,9 +12,14 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
-import { chatWithGemini, type FunctionCallResult, type GeminiResponse } from '../../services/geminiService';
+import {
+    type ChatMessage,
+    chatWithGemini,
+    type FunctionCallResult,
+    type GeminiResponse,
+} from '../../services/geminiService';
 
 // ── Placeholder Cycling Prompts ────────────────────────────────────────
 const PROMPTS = [
@@ -25,13 +31,23 @@ const PROMPTS = [
     'Where is Gate 21?',
 ];
 
+// ── Message type shown in the UI ───────────────────────────────────────
+interface UIMessage {
+    role: 'user' | 'assistant';
+    content: string;
+    functionCalls?: FunctionCallResult[];
+}
+
 // ── Component ──────────────────────────────────────────────────────────
 export default function HeroSearchConcierge() {
     const [query, setQuery] = useState('');
+    const [followUp, setFollowUp] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
-    const [response, setResponse] = useState<GeminiResponse | null>(null);
+    const [messages, setMessages] = useState<UIMessage[]>([]);
     const [placeholderIdx, setPlaceholderIdx] = useState(0);
+
+    const scrollRef = useRef<ScrollView>(null);
 
     // Animations
     const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -110,32 +126,70 @@ export default function HeroSearchConcierge() {
         }
     }, [showModal]);
 
-    // ── Submit Handler ─────────────────────────────────────────────────
-    const handleSubmit = useCallback(async () => {
-        const trimmed = query.trim();
+    // ── Auto-scroll to bottom when messages update ─────────────────────
+    useEffect(() => {
+        if (showModal && messages.length > 0) {
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+        }
+    }, [messages, showModal]);
+
+    // ── Core send logic (shared by initial + follow-up) ────────────────
+    const sendMessage = useCallback(async (text: string) => {
+        const trimmed = text.trim();
         if (!trimmed || isLoading) return;
 
         Keyboard.dismiss();
+
+        // Build history from all current messages (for Gemini multi-turn context)
+        const history: ChatMessage[] = messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+        }));
+
+        // Append user message immediately
+        const userMsg: UIMessage = { role: 'user', content: trimmed };
+        setMessages((prev) => [...prev, userMsg]);
         setIsLoading(true);
-        setShowModal(true);
-        setResponse(null);
 
         try {
-            const result = await chatWithGemini(trimmed);
-            setResponse(result);
-        } catch (err) {
-            setResponse({
-                text: 'Something went wrong. Please try again.',
-                functionCalls: [],
-            });
+            const result: GeminiResponse = await chatWithGemini(trimmed, history);
+            const assistantMsg: UIMessage = {
+                role: 'assistant',
+                content: result.text,
+                functionCalls: result.functionCalls,
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+        } catch {
+            setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: 'Something went wrong. Please try again.' },
+            ]);
         } finally {
             setIsLoading(false);
         }
-    }, [query, isLoading]);
+    }, [messages, isLoading]);
+
+    // ── Initial Submit (from search bar) ──────────────────────────────
+    const handleSubmit = useCallback(async () => {
+        const trimmed = query.trim();
+        if (!trimmed || isLoading) return;
+        setQuery('');
+        setShowModal(true);
+        await sendMessage(trimmed);
+    }, [query, isLoading, sendMessage]);
+
+    // ── Follow-up Submit (from in-modal input) ─────────────────────────
+    const handleFollowUp = useCallback(async () => {
+        const trimmed = followUp.trim();
+        if (!trimmed || isLoading) return;
+        setFollowUp('');
+        await sendMessage(trimmed);
+    }, [followUp, isLoading, sendMessage]);
 
     const handleClose = () => {
         setShowModal(false);
-        setResponse(null);
+        setMessages([]);
+        setFollowUp('');
     };
 
     // ── Shimmer interpolation ──────────────────────────────────────────
@@ -158,9 +212,8 @@ export default function HeroSearchConcierge() {
                             onSubmitEditing={handleSubmit}
                             returnKeyType="send"
                             placeholderTextColor="transparent"
-                            selectionColor="#00A0B2"
+                            selectionColor="#FFFFFF"
                         />
-                        {/* Custom animated placeholder */}
                         {!query && (
                             <Animated.View style={[styles.placeholderContainer, { opacity: placeholderOpacity }]} pointerEvents="none">
                                 <Text style={styles.placeholderText}>
@@ -174,11 +227,12 @@ export default function HeroSearchConcierge() {
                         style={[styles.sendBtn, !!query.trim() && styles.sendBtnActive]}
                         disabled={!query.trim() || isLoading}
                     >
-                        <Text style={styles.sendBtnText}>{isLoading ? '⏳' : '→'}</Text>
+                        <Text style={[styles.sendBtnText, !!query.trim() && styles.sendBtnTextActive]}>
+                            {isLoading ? '⏳' : '→'}
+                        </Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* Loading shimmer bar */}
                 {isLoading && (
                     <View style={styles.shimmerTrack}>
                         <Animated.View
@@ -191,7 +245,7 @@ export default function HeroSearchConcierge() {
                 )}
             </View>
 
-            {/* Response Modal */}
+            {/* Chat Modal */}
             <Modal
                 visible={showModal}
                 transparent
@@ -199,57 +253,96 @@ export default function HeroSearchConcierge() {
                 onRequestClose={handleClose}
             >
                 <Pressable style={styles.modalOverlay} onPress={handleClose}>
-                    <Animated.View
-                        style={[
-                            styles.modalContent,
-                            { transform: [{ translateY: modalSlide }] },
-                        ]}
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.modalKAV}
                     >
-                        <Pressable onPress={(e) => e.stopPropagation()}>
-                            {/* Modal Handle */}
-                            <View style={styles.modalHandle} />
-
-                            {/* Loading State */}
-                            {isLoading && (
-                                <View style={styles.loadingContainer}>
-                                    <Animated.View style={{ opacity: pulseAnim }}>
-                                        <Text style={styles.loadingIcon}>✦</Text>
-                                    </Animated.View>
-                                    <Text style={styles.loadingText}>Oasis is thinking...</Text>
-                                    <Text style={styles.loadingSubtext}>Processing your request via Gemini</Text>
+                        <Animated.View
+                            style={[
+                                styles.modalContent,
+                                { transform: [{ translateY: modalSlide }] },
+                            ]}
+                        >
+                            <Pressable onPress={(e) => e.stopPropagation()} style={{ flex: 1 }}>
+                                {/* Handle + header */}
+                                <View style={styles.modalHandle} />
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.modalTitle}>✦ OASIS</Text>
+                                    <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+                                        <Text style={styles.closeBtnText}>Done</Text>
+                                    </TouchableOpacity>
                                 </View>
-                            )}
 
-                            {/* Response Content */}
-                            {response && !isLoading && (
+                                {/* Message History */}
                                 <ScrollView
-                                    style={styles.responseScroll}
+                                    ref={scrollRef}
+                                    style={styles.messageList}
+                                    contentContainerStyle={styles.messageListContent}
                                     showsVerticalScrollIndicator={false}
+                                    keyboardShouldPersistTaps="handled"
                                 >
-                                    {/* Function Call Cards */}
-                                    {response.functionCalls.map((fc, idx) => (
-                                        <FunctionCallCard key={idx} call={fc} />
+                                    {messages.map((msg, idx) => (
+                                        <View key={idx}>
+                                            {msg.role === 'user' ? (
+                                                <View style={styles.userBubbleRow}>
+                                                    <View style={styles.userBubble}>
+                                                        <Text style={styles.userBubbleText}>{msg.content}</Text>
+                                                    </View>
+                                                </View>
+                                            ) : (
+                                                <View style={styles.assistantBlock}>
+                                                    {/* Function call cards */}
+                                                    {(msg.functionCalls ?? []).map((fc, fcIdx) => (
+                                                        <FunctionCallCard key={fcIdx} call={fc} />
+                                                    ))}
+                                                    {/* Text response */}
+                                                    {msg.content ? (
+                                                        <View style={styles.assistantBubble}>
+                                                            <Text style={styles.assistantLabel}>✦ Oasis</Text>
+                                                            <Text style={styles.assistantText}>{msg.content}</Text>
+                                                        </View>
+                                                    ) : null}
+                                                </View>
+                                            )}
+                                        </View>
                                     ))}
 
-                                    {/* AI Text Response */}
-                                    {response.text ? (
-                                        <View style={styles.textResponse}>
-                                            <View style={styles.textResponseHeader}>
-                                                <Text style={styles.aiAvatar}>✦</Text>
-                                                <Text style={styles.aiName}>Oasis</Text>
+                                    {/* Typing indicator */}
+                                    {isLoading && (
+                                        <View style={styles.assistantBlock}>
+                                            <View style={styles.assistantBubble}>
+                                                <Animated.Text style={[styles.assistantLabel, { opacity: pulseAnim }]}>
+                                                    ✦ Oasis is thinking...
+                                                </Animated.Text>
                                             </View>
-                                            <Text style={styles.responseText}>{response.text}</Text>
                                         </View>
-                                    ) : null}
-
-                                    {/* Close Button */}
-                                    <TouchableOpacity style={styles.closeModalBtn} onPress={handleClose}>
-                                        <Text style={styles.closeModalText}>Done</Text>
-                                    </TouchableOpacity>
+                                    )}
                                 </ScrollView>
-                            )}
-                        </Pressable>
-                    </Animated.View>
+
+                                {/* Follow-up Input */}
+                                <View style={styles.followUpBar}>
+                                    <TextInput
+                                        style={styles.followUpInput}
+                                        value={followUp}
+                                        onChangeText={setFollowUp}
+                                        onSubmitEditing={handleFollowUp}
+                                        returnKeyType="send"
+                                        placeholder="Ask a follow-up..."
+                                        placeholderTextColor="#444444"
+                                        selectionColor="#FFFFFF"
+                                        editable={!isLoading}
+                                    />
+                                    <TouchableOpacity
+                                        onPress={handleFollowUp}
+                                        style={[styles.followUpSend, !!followUp.trim() && !isLoading && styles.followUpSendActive]}
+                                        disabled={!followUp.trim() || isLoading}
+                                    >
+                                        <Text style={[styles.followUpSendText, !!followUp.trim() && !isLoading && styles.followUpSendTextActive]}>→</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </Pressable>
+                        </Animated.View>
+                    </KeyboardAvoidingView>
                 </Pressable>
             </Modal>
         </View>
@@ -291,11 +384,10 @@ function FunctionCallCard({ call }: { call: FunctionCallResult }) {
             </View>
             <Text style={styles.fcMessage}>{call.result.message}</Text>
 
-            {/* Data pills */}
             {call.result.data && (
                 <View style={styles.dataPills}>
                     {Object.entries(call.result.data)
-                        .filter(([k, v]) => typeof v === 'string' || typeof v === 'number')
+                        .filter(([, v]) => typeof v === 'string' || typeof v === 'number')
                         .slice(0, 4)
                         .map(([key, value]) => (
                             <View key={key} style={styles.dataPill}>
@@ -317,11 +409,10 @@ const styles = StyleSheet.create({
 
     // Search Bar
     searchBarOuter: {
-        borderRadius: 18,
         overflow: 'hidden',
-        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        backgroundColor: '#111111',
         borderWidth: 1,
-        borderColor: 'rgba(0, 160, 178, 0.2)',
+        borderColor: '#2A2A2A',
     },
     searchBarInner: {
         flexDirection: 'row',
@@ -332,7 +423,7 @@ const styles = StyleSheet.create({
     },
     searchIcon: {
         fontSize: 18,
-        color: '#00A0B2',
+        color: '#FFFFFF',
     },
     inputWrapper: {
         flex: 1,
@@ -349,211 +440,260 @@ const styles = StyleSheet.create({
     },
     placeholderContainer: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        top: 0, left: 0, right: 0, bottom: 0,
         justifyContent: 'center',
     },
     placeholderText: {
-        color: 'rgba(255, 255, 255, 0.3)',
+        color: '#444444',
         fontSize: 15,
         fontWeight: '500',
     },
     sendBtn: {
         width: 36,
         height: 36,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
         justifyContent: 'center',
         alignItems: 'center',
     },
     sendBtnActive: {
-        backgroundColor: '#00A0B2',
+        backgroundColor: '#FFFFFF',
+        borderColor: '#FFFFFF',
     },
     sendBtnText: {
-        color: '#FFFFFF',
+        color: '#444444',
         fontSize: 18,
         fontWeight: '700',
+    },
+    sendBtnTextActive: {
+        color: '#000000',
     },
 
     // Shimmer
     shimmerTrack: {
         height: 2,
-        backgroundColor: 'rgba(0, 160, 178, 0.1)',
+        backgroundColor: '#1A1A1A',
         overflow: 'hidden',
     },
     shimmerBar: {
         width: 200,
         height: 2,
-        backgroundColor: '#00A0B2',
-        borderRadius: 1,
+        backgroundColor: '#FFFFFF',
     },
 
     // Modal
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'flex-end',
+    },
+    modalKAV: {
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: 'rgba(22, 22, 26, 0.98)',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        paddingHorizontal: 20,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-        paddingTop: 12,
-        maxHeight: '75%',
+        backgroundColor: '#111111',
         borderTopWidth: 1,
         borderLeftWidth: 1,
         borderRightWidth: 1,
-        borderColor: 'rgba(0, 160, 178, 0.15)',
+        borderColor: '#2A2A2A',
+        paddingBottom: Platform.OS === 'ios' ? 0 : 0,
+        maxHeight: '80%',
+        minHeight: 300,
     },
     modalHandle: {
         width: 36,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        height: 3,
+        backgroundColor: '#333333',
         alignSelf: 'center',
-        marginBottom: 20,
+        marginTop: 10,
+        marginBottom: 8,
     },
-
-    // Loading
-    loadingContainer: {
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 40,
+        paddingHorizontal: 16,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#2A2A2A',
     },
-    loadingIcon: {
-        fontSize: 36,
-        color: '#00A0B2',
-        marginBottom: 12,
-    },
-    loadingText: {
+    modalTitle: {
         color: '#FFFFFF',
-        fontSize: 16,
+        fontSize: 12,
+        fontWeight: '800',
+        letterSpacing: 2,
+    },
+    closeBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+    },
+    closeBtnText: {
+        color: '#888888',
+        fontSize: 12,
         fontWeight: '600',
     },
-    loadingSubtext: {
-        color: 'rgba(255, 255, 255, 0.35)',
-        fontSize: 12,
-        marginTop: 4,
+
+    // Message List
+    messageList: {
+        flex: 1,
+    },
+    messageListContent: {
+        padding: 16,
+        gap: 12,
+        flexGrow: 1,
     },
 
-    // Response
-    responseScroll: {
-        maxHeight: 500,
+    // User bubble
+    userBubbleRow: {
+        alignItems: 'flex-end',
+        marginBottom: 4,
     },
-    textResponse: {
-        marginTop: 4,
-        marginBottom: 16,
+    userBubble: {
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        maxWidth: '80%',
     },
-    textResponseHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 10,
+    userBubbleText: {
+        color: '#000000',
+        fontSize: 14,
+        fontWeight: '500',
+        lineHeight: 20,
     },
-    aiAvatar: {
-        fontSize: 16,
-        color: '#00A0B2',
+
+    // Assistant block
+    assistantBlock: {
+        marginBottom: 4,
     },
-    aiName: {
-        color: '#00A0B2',
-        fontSize: 13,
+    assistantBubble: {
+        backgroundColor: '#1A1A1A',
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        maxWidth: '90%',
+    },
+    assistantLabel: {
+        color: '#666666',
+        fontSize: 10,
         fontWeight: '700',
-        letterSpacing: 0.5,
+        letterSpacing: 1.5,
+        marginBottom: 6,
     },
-    responseText: {
-        color: 'rgba(255, 255, 255, 0.85)',
-        fontSize: 15,
-        lineHeight: 22,
+    assistantText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        lineHeight: 21,
         fontWeight: '400',
     },
 
     // Function Call Card
     fcCard: {
-        borderRadius: 14,
-        padding: 16,
-        marginBottom: 12,
         borderWidth: 1,
+        padding: 12,
+        marginBottom: 8,
     },
     fcCardSuccess: {
-        backgroundColor: 'rgba(0, 160, 178, 0.08)',
-        borderColor: 'rgba(0, 160, 178, 0.2)',
+        backgroundColor: '#0D1A1A',
+        borderColor: '#1A3A3A',
     },
     fcCardError: {
-        backgroundColor: 'rgba(239, 68, 68, 0.08)',
-        borderColor: 'rgba(239, 68, 68, 0.2)',
+        backgroundColor: '#1A0D0D',
+        borderColor: '#3A1A1A',
     },
     fcHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
-        marginBottom: 10,
+        marginBottom: 8,
     },
-    fcIcon: {
-        fontSize: 22,
-    },
-    fcHeaderText: {
-        flex: 1,
-    },
+    fcIcon: { fontSize: 20 },
+    fcHeaderText: { flex: 1 },
     fcLabel: {
         color: '#FFFFFF',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '700',
     },
     fcStatus: {
-        color: 'rgba(255, 255, 255, 0.45)',
-        fontSize: 11,
+        color: '#666666',
+        fontSize: 10,
         fontWeight: '500',
-        marginTop: 2,
+        marginTop: 1,
     },
     fcMessage: {
-        color: 'rgba(255, 255, 255, 0.75)',
-        fontSize: 13,
-        lineHeight: 19,
+        color: '#AAAAAA',
+        fontSize: 12,
+        lineHeight: 18,
     },
     dataPills: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 6,
-        marginTop: 12,
+        marginTop: 10,
     },
     dataPill: {
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        backgroundColor: '#2A2A2A',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
     },
     dataPillKey: {
-        color: 'rgba(255, 255, 255, 0.35)',
+        color: '#666666',
         fontSize: 9,
-        fontWeight: '600',
+        fontWeight: '700',
         textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
     dataPillValue: {
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
         marginTop: 1,
     },
 
-    // Close
-    closeModalBtn: {
-        alignSelf: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 40,
-        marginTop: 8,
-        marginBottom: 8,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Follow-up input
+    followUpBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderTopWidth: 1,
+        borderTopColor: '#2A2A2A',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+        gap: 10,
+        backgroundColor: '#111111',
     },
-    closeModalText: {
-        color: 'rgba(255, 255, 255, 0.6)',
+    followUpInput: {
+        flex: 1,
+        color: '#FFFFFF',
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '400',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#1A1A1A',
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
+    },
+    followUpSend: {
+        width: 36,
+        height: 36,
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    followUpSendActive: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#FFFFFF',
+    },
+    followUpSendText: {
+        color: '#444444',
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    followUpSendTextActive: {
+        color: '#000000',
     },
 });

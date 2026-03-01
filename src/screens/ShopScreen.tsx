@@ -5,7 +5,6 @@ import {
     SafeAreaView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
 } from 'react-native';
 import ShopItemCard from '../components/shop/ShopItemCard';
@@ -20,61 +19,58 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useFlightStore } from '../stores/useFlightStore';
 import { useWalletStore } from '../stores/useWalletStore';
 
-type Category = 'all' | 'duty-free' | 'food' | 'lounge' | 'service';
+const VENDOR_ICONS: Record<string, string> = {
+    'Pret A Manger': '☕',
+    'World Duty Free': '🛍️',
+    'The Red Lion': '🍺',
+};
+
+type ListRow =
+    | { type: 'vendor-header'; shopName: string }
+    | { type: 'item'; item: ShopItem };
+
+// Build flat list: vendor header → items → vendor header → items …
+function buildRows(): ListRow[] {
+    const vendors = [...new Set(MOCK_SHOP_ITEMS.map((i) => i.shopName))];
+    const rows: ListRow[] = [];
+    for (const shopName of vendors) {
+        rows.push({ type: 'vendor-header', shopName });
+        MOCK_SHOP_ITEMS.filter((i) => i.shopName === shopName).forEach((item) =>
+            rows.push({ type: 'item', item })
+        );
+    }
+    return rows;
+}
+
+const LIST_ROWS = buildRows();
 
 export default function ShopScreen() {
-    const [category, setCategory] = useState<Category>('all');
     const [pinModalVisible, setPinModalVisible] = useState(false);
     const { connected, signTransaction } = useSolana();
-    const { balance, setBalance, loyaltyTokens, setLoyaltyTokens } = useWalletStore();
+    const { loyaltyTokens, setLoyaltyTokens } = useWalletStore();
     const user = useAuthStore((s) => s.user);
     const flightNumber = useAuthStore((s) => s.flightNumber);
     const departures = useFlightStore((s) => s.departures);
 
-    // Resolve the passenger's gate from their flight data
     const myFlight = departures.find(
         (f) => f.flight.iataNumber.replace(/\s/g, '').toUpperCase() ===
                (flightNumber ?? '').replace(/\s/g, '').toUpperCase()
     );
     const passengerGate = myFlight?.departure.gate ?? 'TBD';
 
-    const categories: { key: Category; label: string; icon: string }[] = [
-        { key: 'all', label: 'All', icon: '🏪' },
-        { key: 'duty-free', label: 'Duty Free', icon: '🛍️' },
-        { key: 'food', label: 'Food', icon: '🍽️' },
-        { key: 'lounge', label: 'Lounges', icon: '✨' },
-        { key: 'service', label: 'Services', icon: '⚡' },
-    ];
-
-    const filteredItems = category === 'all'
-        ? MOCK_SHOP_ITEMS
-        : MOCK_SHOP_ITEMS.filter((item) => item.category === category);
-
     const handleBuy = async (item: ShopItem) => {
         if (!connected) {
-            Alert.alert('Wallet Required', 'Connect your Solana wallet to make purchases.', [
-                { text: 'OK' },
-            ]);
-            return;
-        }
-        if (balance < item.price) {
-            Alert.alert('Insufficient Balance', `You need ${item.price} SOL for this purchase.`);
+            Alert.alert('Wallet Required', 'Connect your Solana wallet to make purchases.', [{ text: 'OK' }]);
             return;
         }
 
         try {
-            // Simulate Blink transaction flow
-            // 1. GET metadata (already have it from item)
-            // 2. POST to get signable transaction
             const mockTx = `checkout_${item.id}_${Date.now()}`;
             const sig = await signTransaction(mockTx);
 
-            // Update balances
-            setBalance(balance - item.price);
             const reward = calculateLoyaltyReward(item.price);
             setLoyaltyTokens(loyaltyTokens + reward);
 
-            // 1. Update local Zustand store (same-device worker sees it instantly)
             const localOrder = createOrder({
                 item: item.name,
                 price: item.price,
@@ -83,7 +79,6 @@ export default function ShopScreen() {
                 passengerName: user?.name ?? 'Oasis Guest',
             });
 
-            // 2. Persist to Supabase (cross-device realtime sync)
             try {
                 const { error: insertError } = await supabase.from('orders').insert([{
                     item: localOrder.item,
@@ -103,7 +98,7 @@ export default function ShopScreen() {
 
             Alert.alert(
                 '🎉 Order Placed!',
-                `${item.name} ordered from ${item.shopName}!\n\nA worker is preparing your order — the droid will deliver to Gate ${passengerGate}.\n\n+${reward} OASIS tokens earned\nTx: ${sig.substring(0, 16)}...`
+                `${item.name} ordered from ${item.shopName}!\n\nA droid will deliver to Gate ${passengerGate}.\n\n+${reward} OASIS tokens earned\nTx: ${sig.substring(0, 16)}...`
             );
         } catch {
             Alert.alert('Transaction Failed', 'Please try again.');
@@ -115,40 +110,39 @@ export default function ShopScreen() {
             <View style={styles.header}>
                 <Text style={styles.label}>GATWICK MARKETPLACE</Text>
                 <Text style={styles.title}>Shop</Text>
-                <Text style={styles.subtitle}>Pay with SOL • Earn OASIS rewards</Text>
+                <Text style={styles.subtitle}>Order now · Droid delivers to your gate</Text>
             </View>
-
-            {/* Droid Delivery Tracker */}
             <RobotTrackerCard onPinPress={() => setPinModalVisible(true)} />
-
-            {/* Category Filter */}
-            <View style={styles.categoryRow}>
-                {categories.map(({ key, label, icon }) => (
-                    <TouchableOpacity
-                        key={key}
-                        style={[styles.categoryBtn, category === key && styles.categoryBtnActive]}
-                        onPress={() => setCategory(key)}
-                    >
-                        <Text style={styles.categoryIcon}>{icon}</Text>
-                        <Text style={[styles.categoryLabel, category === key && styles.categoryLabelActive]}>
-                            {label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
         </View>
     );
+
+    const renderRow = ({ item: row }: { item: ListRow }) => {
+        if (row.type === 'vendor-header') {
+            return (
+                <View style={styles.vendorHeader}>
+                    <Text style={styles.vendorIcon}>{VENDOR_ICONS[row.shopName] ?? '🏪'}</Text>
+                    <View style={styles.vendorHeaderText}>
+                        <Text style={styles.vendorName}>{row.shopName}</Text>
+                        <View style={styles.vendorLiveDot} />
+                    </View>
+                </View>
+            );
+        }
+        return (
+            <View style={styles.cardWrapper}>
+                <ShopItemCard item={row.item} onBuy={() => handleBuy(row.item)} />
+            </View>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
             <FlatList
-                data={filteredItems}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                    <View style={styles.cardWrapper}>
-                        <ShopItemCard item={item} onBuy={() => handleBuy(item)} />
-                    </View>
-                )}
+                data={LIST_ROWS}
+                keyExtractor={(row, idx) =>
+                    row.type === 'vendor-header' ? `hdr-${row.shopName}` : `item-${row.item.id}-${idx}`
+                }
+                renderItem={renderRow}
                 ListHeaderComponent={renderHeader}
                 contentContainerStyle={styles.listContent}
             />
@@ -158,21 +152,40 @@ export default function ShopScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#111111' },
+    container: { flex: 1, backgroundColor: '#000000' },
     listContent: { paddingBottom: 100 },
     headerContainer: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8 },
     header: { marginBottom: 20 },
-    label: { color: '#00A0B2', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 4 },
+    label: { color: '#888888', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 4 },
     title: { color: '#FFFFFF', fontSize: 36, fontWeight: '800', letterSpacing: -1 },
-    subtitle: { color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 },
-    categoryRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
-    categoryBtn: {
-        flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    subtitle: { color: '#555555', fontSize: 13, marginTop: 4 },
+
+    // Vendor section header
+    vendorHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 24,
+        paddingBottom: 10,
+        gap: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#1A1A1A',
     },
-    categoryBtnActive: { backgroundColor: 'rgba(0, 160, 178, 0.12)', borderColor: 'rgba(0, 160, 178, 0.3)' },
-    categoryIcon: { fontSize: 16, marginBottom: 2 },
-    categoryLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '600' },
-    categoryLabelActive: { color: '#00A0B2' },
-    cardWrapper: { paddingHorizontal: 16, marginBottom: 12 },
+    vendorIcon: { fontSize: 22 },
+    vendorHeaderText: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+    vendorName: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
+    vendorLiveDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#22C55E',
+    },
+
+    cardWrapper: { paddingHorizontal: 16, marginBottom: 8 },
 });

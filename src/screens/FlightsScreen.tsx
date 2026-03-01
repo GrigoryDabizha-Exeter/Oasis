@@ -20,13 +20,13 @@ import { useFlightStore } from '../stores/useFlightStore';
 import { useQueueStore } from '../stores/useQueueStore';
 
 export default function FlightsScreen() {
-    const { departures, arrivals, flightType, isLoading, dataSource, loadLiveFlights, setFlightType } = useFlightStore();
+    const { departures, arrivals, flightType, isLoading, dataSource, error, loadLiveFlights, setFlightType } = useFlightStore();
     const { queues, setQueues } = useQueueStore();
     const [refreshing, setRefreshing] = useState(false);
     const [showQueues, setShowQueues] = useState(false);
     const [pinModalVisible, setPinModalVisible] = useState(false);
 
-    // Load live flights on mount and refresh queues
+    // Load live flights on mount; auto-refresh every 60 s
     useEffect(() => {
         loadLiveFlights();
         setQueues(generateMockQueues());
@@ -64,30 +64,42 @@ export default function FlightsScreen() {
             {/* AI Concierge Search */}
             <HeroSearchConcierge />
 
-            {/* Live data status */}
-            {isLoading && (
-                <View style={styles.syncRow}>
-                    <Text style={styles.syncText}>⟳ Syncing Gatwick Radar...</Text>
-                </View>
-            )}
-            {!isLoading && dataSource && (
-                <View style={styles.syncRow}>
-                    <Text style={[styles.sourceTag, dataSource === 'live' && styles.sourceTagLive]}>
-                        {dataSource === 'live' ? '🛰 LIVE TELEMETRY' : '📡 SIMULATED'}
+            {/* Data source status row */}
+            <View style={styles.statusRow}>
+                {isLoading ? (
+                    <Text style={styles.syncText}>⟳  SYNCING GATWICK RADAR...</Text>
+                ) : dataSource === 'live' ? (
+                    <Text style={styles.sourceTagLive}>● LIVE TELEMETRY</Text>
+                ) : dataSource === 'error' ? (
+                    <Text style={styles.sourceTagMock}>
+                        ○ OFFLINE{error ? `  ·  ${error.slice(0, 60)}` : ''}
                     </Text>
-                </View>
-            )}
+                ) : null}
+
+                {/* Force Refresh button — always visible so the user can re-trigger */}
+                <TouchableOpacity
+                    style={[styles.refreshBtn, isLoading && styles.refreshBtnDisabled]}
+                    onPress={onRefresh}
+                    disabled={isLoading}
+                >
+                    <Text style={styles.refreshBtnText}>↻ REFRESH</Text>
+                </TouchableOpacity>
+            </View>
 
             {/* Quick Stats */}
             <GlassCard elevated>
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{departures.length}</Text>
+                        <Text style={styles.statValue}>
+                            {isLoading ? '—' : departures.length}
+                        </Text>
                         <Text style={styles.statLabel}>Departures</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{arrivals.length}</Text>
+                        <Text style={styles.statValue}>
+                            {isLoading ? '—' : arrivals.length}
+                        </Text>
                         <Text style={styles.statLabel}>Arrivals</Text>
                     </View>
                     <View style={styles.statDivider} />
@@ -100,7 +112,7 @@ export default function FlightsScreen() {
                 </View>
             </GlassCard>
 
-            {/* Toggle: Flights / Queues */}
+            {/* Toggle: Flights / Security */}
             <View style={styles.toggleRow}>
                 <TouchableOpacity
                     style={[styles.toggleBtn, !showQueues && styles.toggleBtnActive]}
@@ -116,7 +128,7 @@ export default function FlightsScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Flight type toggle */}
+            {/* Departure / Arrival sub-toggle */}
             {!showQueues && (
                 <View style={styles.typeRow}>
                     <TouchableOpacity
@@ -153,7 +165,7 @@ export default function FlightsScreen() {
                     )}
                     ListHeaderComponent={renderHeader}
                     contentContainerStyle={styles.listContent}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00A0B2" />}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
                 />
             </SafeAreaView>
         );
@@ -171,8 +183,16 @@ export default function FlightsScreen() {
                 )}
                 ListHeaderComponent={renderHeader}
                 contentContainerStyle={styles.listContent}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00A0B2" />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
                 initialNumToRender={8}
+                ListEmptyComponent={
+                    !isLoading ? (
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyTitle}>No flights loaded</Text>
+                            <Text style={styles.emptySubtitle}>Pull down to refresh or tap ↻ REFRESH above</Text>
+                        </View>
+                    ) : null
+                }
             />
             <PinUnlockModal visible={pinModalVisible} onClose={() => setPinModalVisible(false)} />
         </SafeAreaView>
@@ -182,14 +202,14 @@ export default function FlightsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#111111',
+        backgroundColor: '#000000',
     },
     listContent: {
         paddingBottom: 100,
     },
     cardWrapper: {
         paddingHorizontal: 16,
-        marginBottom: 12,
+        marginBottom: 8,
     },
     headerContainer: {
         paddingHorizontal: 16,
@@ -201,7 +221,7 @@ const styles = StyleSheet.create({
         paddingTop: 8,
     },
     heroLabel: {
-        color: '#00A0B2',
+        color: '#666666',
         fontSize: 11,
         fontWeight: '700',
         letterSpacing: 2,
@@ -214,10 +234,59 @@ const styles = StyleSheet.create({
         letterSpacing: -1,
     },
     heroSubtitle: {
-        color: 'rgba(255,255,255,0.4)',
+        color: '#444444',
         fontSize: 15,
         marginTop: 4,
     },
+
+    // Status row (source tag + refresh button side-by-side)
+    statusRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+        marginTop: 4,
+        minHeight: 28,
+    },
+    syncText: {
+        color: '#888888',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 1.5,
+        flex: 1,
+    },
+    sourceTagLive: {
+        color: '#4ADE80',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 1.5,
+        flex: 1,
+    },
+    sourceTagMock: {
+        color: '#555555',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 1.5,
+        flex: 1,
+    },
+    refreshBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+        backgroundColor: '#111111',
+    },
+    refreshBtnDisabled: {
+        opacity: 0.35,
+    },
+    refreshBtnText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 1.5,
+    },
+
+    // Stats card
     statsRow: {
         flexDirection: 'row',
         justifyContent: 'space-around',
@@ -233,7 +302,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     statLabel: {
-        color: 'rgba(255,255,255,0.4)',
+        color: '#555555',
         fontSize: 11,
         fontWeight: '500',
         marginTop: 4,
@@ -243,8 +312,10 @@ const styles = StyleSheet.create({
     statDivider: {
         width: 1,
         height: 32,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: '#2A2A2A',
     },
+
+    // Flights / Security toggle
     toggleRow: {
         flexDirection: 'row',
         marginTop: 20,
@@ -254,24 +325,25 @@ const styles = StyleSheet.create({
     toggleBtn: {
         flex: 1,
         paddingVertical: 12,
-        borderRadius: 14,
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.04)',
+        backgroundColor: '#111111',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: '#2A2A2A',
     },
     toggleBtnActive: {
-        backgroundColor: 'rgba(0, 160, 178, 0.12)',
-        borderColor: 'rgba(0, 160, 178, 0.3)',
+        backgroundColor: '#FFFFFF',
+        borderColor: '#FFFFFF',
     },
     toggleText: {
-        color: 'rgba(255,255,255,0.4)',
+        color: '#555555',
         fontSize: 14,
         fontWeight: '600',
     },
     toggleTextActive: {
-        color: '#00A0B2',
+        color: '#000000',
     },
+
+    // Departure / Arrival sub-toggle
     typeRow: {
         flexDirection: 'row',
         gap: 8,
@@ -280,39 +352,36 @@ const styles = StyleSheet.create({
     typeBtn: {
         paddingVertical: 8,
         paddingHorizontal: 16,
-        borderRadius: 10,
     },
     typeBtnActive: {
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderBottomWidth: 2,
+        borderBottomColor: '#FFFFFF',
     },
     typeText: {
-        color: 'rgba(255,255,255,0.35)',
+        color: '#444444',
         fontSize: 14,
         fontWeight: '600',
     },
     typeTextActive: {
         color: '#FFFFFF',
     },
-    syncRow: {
+
+    // Empty state
+    emptyState: {
         alignItems: 'center',
-        marginBottom: 12,
-        marginTop: 4,
+        paddingVertical: 48,
+        paddingHorizontal: 32,
     },
-    syncText: {
-        color: '#00A0B2',
-        fontSize: 12,
-        fontWeight: '600',
-        letterSpacing: 0.5,
-        opacity: 0.85,
-    },
-    sourceTag: {
-        color: 'rgba(255,255,255,0.45)',
-        fontSize: 10,
+    emptyTitle: {
+        color: '#444444',
+        fontSize: 16,
         fontWeight: '700',
-        letterSpacing: 1.5,
-        textTransform: 'uppercase',
+        marginBottom: 8,
     },
-    sourceTagLive: {
-        color: '#4ADE80',
+    emptySubtitle: {
+        color: '#333333',
+        fontSize: 13,
+        textAlign: 'center',
+        lineHeight: 20,
     },
 });

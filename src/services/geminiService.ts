@@ -105,6 +105,12 @@ Available items for ordering: ${MOCK_SHOP_ITEMS.map(i => `${i.name} (${i.price} 
 If the user asks to "buy a coffee" or similar food/drink item without specifying, order a coffee (0.05 SOL) from Gatwick Café. 
 For any purchase request, pick a reasonable gate if none is specified (e.g. Gate 1).`;
 
+// ── Chat History Type ──────────────────────────────────────────────────
+export interface ChatMessage {
+    role: 'user' | 'assistant';
+    content: string;
+}
+
 // ── Function Call Result Type ──────────────────────────────────────────
 export interface FunctionCallResult {
     functionName: string;
@@ -356,7 +362,10 @@ function executeFunction(name: string, args: Record<string, string>): FunctionCa
 }
 
 // ── Main Chat Interface ────────────────────────────────────────────────
-export async function chatWithGemini(userMessage: string): Promise<GeminiResponse> {
+export async function chatWithGemini(
+    userMessage: string,
+    history: ChatMessage[] = [],
+): Promise<GeminiResponse> {
     const model = genAI.getGenerativeModel({
         model: 'gemini-2.5-flash',
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -364,10 +373,19 @@ export async function chatWithGemini(userMessage: string): Promise<GeminiRespons
         toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
     });
 
+    // Convert prior messages to Gemini's alternating user/model history format.
+    // Only include text turns; function-call turns are not replayed here.
+    const geminiHistory = history
+        .filter((m) => m.content.trim().length > 0)
+        .map((m) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+        }));
+
     const functionCalls: FunctionCallResult[] = [];
 
     try {
-        const chat = model.startChat();
+        const chat = model.startChat({ history: geminiHistory });
         let response: any = await chat.sendMessage(userMessage);
 
         // Process function calls in a loop (Gemini may chain multiple)

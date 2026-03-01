@@ -10,6 +10,10 @@ interface ShopItemCardProps {
 }
 
 export default function ShopItemCard({ item, onBuy }: ShopItemCardProps) {
+    const isGBP = item.currency === 'GBP';
+    const priceDisplay = isGBP ? `£${item.price.toFixed(2)}` : `${item.price} ${item.currency}`;
+    const priceNote = isGBP ? 'Droid delivery · Pay with OASIS' : `≈ $${(item.price * 145).toFixed(2)} USD`;
+
     return (
         <GlassCard elevated>
             <View style={styles.header}>
@@ -25,11 +29,11 @@ export default function ShopItemCard({ item, onBuy }: ShopItemCardProps) {
 
             <View style={styles.priceRow}>
                 <View>
-                    <Text style={styles.price}>{item.price} {item.currency}</Text>
-                    <Text style={styles.priceNote}>≈ ${(item.price * 145).toFixed(2)} USD</Text>
+                    <Text style={styles.price}>{priceDisplay}</Text>
+                    <Text style={styles.priceNote}>{priceNote}</Text>
                 </View>
                 <GlassButton
-                    title="Pay with SOL"
+                    title="Order Now"
                     icon="◎"
                     size="sm"
                     onPress={onBuy}
@@ -47,19 +51,21 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     emoji: {
-        fontSize: 40,
+        fontSize: 36,
     },
     categoryBadge: {
-        backgroundColor: 'rgba(0, 160, 178, 0.15)',
+        backgroundColor: '#1A1A1A',
         paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 8,
+        borderRadius: 0,
+        borderWidth: 1,
+        borderColor: '#333333',
     },
     categoryText: {
-        color: '#00A0B2',
-        fontSize: 10,
-        fontWeight: '600',
-        letterSpacing: 0.5,
+        color: '#888888',
+        fontSize: 9,
+        fontWeight: '700',
+        letterSpacing: 1,
         textTransform: 'uppercase',
     },
     name: {
@@ -69,13 +75,13 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     shop: {
-        color: '#00A0B2',
+        color: '#888888',
         fontSize: 12,
         fontWeight: '600',
         marginBottom: 8,
     },
     description: {
-        color: 'rgba(255,255,255,0.5)',
+        color: '#666666',
         fontSize: 13,
         lineHeight: 18,
         marginBottom: 14,
@@ -85,7 +91,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.06)',
+        borderTopColor: '#2A2A2A',
         paddingTop: 12,
     },
     price: {
@@ -94,7 +100,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     priceNote: {
-        color: 'rgba(255,255,255,0.35)',
+        color: '#555555',
         fontSize: 11,
         marginTop: 2,
     },

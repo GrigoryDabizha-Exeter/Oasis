@@ -1,79 +1,83 @@
-// Mock Shop Data & Loyalty Service
+// Shop Data & Loyalty Service — Real Gatwick Vendors
 import { ShopItem } from './types';
 
 export const MOCK_SHOP_ITEMS: ShopItem[] = [
+    // ── Pret A Manger ─────────────────────────────────────────────────────────
     {
-        id: 'item-1',
-        name: 'Johnnie Walker Blue Label',
-        description: 'Premium blended Scotch whisky, 700ml. Exclusive duty-free price.',
-        price: 0.85,
-        currency: 'SOL',
-        image: '🥃',
-        category: 'duty-free',
-        shopName: 'World Duty Free',
-        blinkUrl: 'solana-action://oasis.app/api/checkout?item=item-1',
+        id: 'pret-1',
+        name: 'Flat White',
+        description: 'Double-shot espresso with steamed whole milk. Ready in 3 min.',
+        price: 3.40,
+        currency: 'GBP',
+        image: '☕',
+        category: 'food',
+        shopName: 'Pret A Manger',
+        blinkUrl: 'solana-action://oasis.app/api/checkout?item=pret-1',
     },
     {
-        id: 'item-2',
-        name: 'Chanel N°5 Eau de Parfum',
-        description: 'Classic French perfume, 100ml. Tax-free savings.',
-        price: 0.52,
-        currency: 'SOL',
+        id: 'pret-2',
+        name: 'Chicken Avocado Baguette',
+        description: 'Freshly made chicken & avocado baguette. Ready in 2 min.',
+        price: 4.50,
+        currency: 'GBP',
+        image: '🥖',
+        category: 'food',
+        shopName: 'Pret A Manger',
+        blinkUrl: 'solana-action://oasis.app/api/checkout?item=pret-2',
+    },
+
+    // ── World Duty Free ───────────────────────────────────────────────────────
+    {
+        id: 'wdf-1',
+        name: 'Toblerone Gift Pack',
+        description: 'Swiss milk chocolate with honey & almond nougat, 400g. Duty-free price.',
+        price: 8.00,
+        currency: 'GBP',
+        image: '🍫',
+        category: 'duty-free',
+        shopName: 'World Duty Free',
+        blinkUrl: 'solana-action://oasis.app/api/checkout?item=wdf-1',
+    },
+    {
+        id: 'wdf-2',
+        name: 'Tom Ford Oud Wood',
+        description: 'Iconic woody fragrance EDP, 50ml. Significant tax-free saving vs retail.',
+        price: 95.00,
+        currency: 'GBP',
         image: '🌸',
         category: 'duty-free',
         shopName: 'World Duty Free',
-        blinkUrl: 'solana-action://oasis.app/api/checkout?item=item-2',
+        blinkUrl: 'solana-action://oasis.app/api/checkout?item=wdf-2',
     },
+
+    // ── The Red Lion (Wetherspoon) ─────────────────────────────────────────────
     {
-        id: 'item-3',
-        name: 'Premium Lounge Access',
-        description: 'No1 Lounge — unlimited food, drinks, and WiFi. 3-hour access.',
-        price: 0.18,
-        currency: 'SOL',
-        image: '✨',
-        category: 'lounge',
-        shopName: 'No1 Lounge',
-        blinkUrl: 'solana-action://oasis.app/api/checkout?item=item-3',
-    },
-    {
-        id: 'item-4',
-        name: "Nando's Meal Deal",
-        description: 'Half chicken, 2 sides, and a drink. Terminal North.',
-        price: 0.08,
-        currency: 'SOL',
-        image: '🍗',
+        id: 'lion-1',
+        name: 'Camden Hells Lager',
+        description: 'Crisp, hoppy lager by Camden Town Brewery. Served ice cold. Ready in 2 min.',
+        price: 6.20,
+        currency: 'GBP',
+        image: '🍺',
         category: 'food',
-        shopName: "Nando's",
-        blinkUrl: 'solana-action://oasis.app/api/checkout?item=item-4',
+        shopName: 'The Red Lion',
+        blinkUrl: 'solana-action://oasis.app/api/checkout?item=lion-1',
     },
     {
-        id: 'item-5',
-        name: 'Fast Track Security Pass',
-        description: 'Skip the queue — dedicated fast track lane access.',
-        price: 0.03,
-        currency: 'SOL',
-        image: '⚡',
-        category: 'service',
-        shopName: 'Gatwick Services',
-        blinkUrl: 'solana-action://oasis.app/api/checkout?item=item-5',
-    },
-    {
-        id: 'item-6',
-        name: 'Toblerone Gift Pack',
-        description: 'Swiss chocolate selection, 5-pack. Perfect travel gift.',
-        price: 0.04,
-        currency: 'SOL',
-        image: '🍫',
-        category: 'duty-free',
-        shopName: 'WHSmith',
-        blinkUrl: 'solana-action://oasis.app/api/checkout?item=item-6',
+        id: 'lion-2',
+        name: 'Full English Breakfast',
+        description: 'Bacon, eggs, sausage, beans, toast & grilled tomato. Ready in 12 min.',
+        price: 11.00,
+        currency: 'GBP',
+        image: '🍳',
+        category: 'food',
+        shopName: 'The Red Lion',
+        blinkUrl: 'solana-action://oasis.app/api/checkout?item=lion-2',
     },
 ];
 
-// Mock loyalty token operations
-export function calculateLoyaltyReward(purchaseAmountSOL: number): number {
-    // 10 OASIS loyalty tokens per 0.01 SOL spent
-    return Math.floor(purchaseAmountSOL * 1000);
+export function calculateLoyaltyReward(purchaseAmountGBP: number): number {
+    // 10 OASIS tokens per £1 spent
+    return Math.floor(purchaseAmountGBP * 10);
 }
 
 export function getLoyaltyBurnOptions() {
