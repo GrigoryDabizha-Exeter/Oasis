@@ -80,20 +80,26 @@ export default function ShopScreen() {
                 price: item.price,
                 shopName: item.shopName,
                 gate: passengerGate,
-                passengerName: user?.name ?? 'Passenger',
+                passengerName: user?.name ?? 'Oasis Guest',
             });
 
             // 2. Persist to Supabase (cross-device realtime sync)
-            supabase.from('orders').insert([{
-                item: localOrder.item,
-                passenger_name: localOrder.passengerName,
-                status: 'pending',
-                gate: localOrder.gate,
-                shop_name: localOrder.shopName,
-                price: localOrder.price,
-            }]).then((result: { error: { message: string } | null }) => {
-                if (result.error) console.warn('[Supabase] Order insert failed:', result.error.message);
-            });
+            try {
+                const { error: insertError } = await supabase.from('orders').insert([{
+                    item: localOrder.item,
+                    passenger_name: localOrder.passengerName,
+                    status: 'pending',
+                    gate: localOrder.gate,
+                    shop_name: localOrder.shopName,
+                    price: localOrder.price,
+                }]);
+                if (insertError) {
+                    Alert.alert('Cloud Error', insertError.message);
+                }
+            } catch (cloudErr: unknown) {
+                const msg = cloudErr instanceof Error ? cloudErr.message : 'Unknown error';
+                Alert.alert('Cloud Error', msg);
+            }
 
             Alert.alert(
                 '🎉 Order Placed!',

@@ -68,6 +68,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="lounge"
+        options={{
+          title: 'Lounge',
+          tabBarIcon: ({ focused }) => <TabDot focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
