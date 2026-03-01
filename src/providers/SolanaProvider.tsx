@@ -48,8 +48,8 @@ export default function SolanaProvider({ children }: { children: ReactNode }) {
             const mockKey = generateMockPublicKey();
             walletStore.setPublicKey(mockKey);
             walletStore.setConnected(true);
-            walletStore.setBalance(2.5);
-            walletStore.setLoyaltyTokens(1250);
+            walletStore.setBalance(500);
+            walletStore.setLoyaltyTokens(12500);
         } catch (error) {
             Alert.alert('Wallet Connection Failed', 'Please ensure Phantom or Backpack is installed.');
         }
