@@ -12,8 +12,11 @@ import ShopItemCard from '../components/shop/ShopItemCard';
 import PinUnlockModal from '../components/ui/PinUnlockModal';
 import RobotTrackerCard from '../components/ui/RobotTrackerCard';
 import { useSolana } from '../providers/SolanaProvider';
+import { createOrder } from '../services/ordersApi';
 import { MOCK_SHOP_ITEMS, calculateLoyaltyReward } from '../services/shopService';
 import { ShopItem } from '../services/types';
+import { useAuthStore } from '../stores/useAuthStore';
+import { useFlightStore } from '../stores/useFlightStore';
 import { useWalletStore } from '../stores/useWalletStore';
 
 type Category = 'all' | 'duty-free' | 'food' | 'lounge' | 'service';
@@ -23,6 +26,16 @@ export default function ShopScreen() {
     const [pinModalVisible, setPinModalVisible] = useState(false);
     const { connected, signTransaction } = useSolana();
     const { balance, setBalance, loyaltyTokens, setLoyaltyTokens } = useWalletStore();
+    const user = useAuthStore((s) => s.user);
+    const flightNumber = useAuthStore((s) => s.flightNumber);
+    const departures = useFlightStore((s) => s.departures);
+
+    // Resolve the passenger's gate from their flight data
+    const myFlight = departures.find(
+        (f) => f.flight.iataNumber.replace(/\s/g, '').toUpperCase() ===
+               (flightNumber ?? '').replace(/\s/g, '').toUpperCase()
+    );
+    const passengerGate = myFlight?.departure.gate ?? 'TBD';
 
     const categories: { key: Category; label: string; icon: string }[] = [
         { key: 'all', label: 'All', icon: '🏪' },
@@ -60,9 +73,18 @@ export default function ShopScreen() {
             const reward = calculateLoyaltyReward(item.price);
             setLoyaltyTokens(loyaltyTokens + reward);
 
+            // Dispatch order to the worker dashboard via the shared order store
+            createOrder({
+                item: item.name,
+                price: item.price,
+                shopName: item.shopName,
+                gate: passengerGate,
+                passengerName: user?.name ?? 'Passenger',
+            });
+
             Alert.alert(
-                '🎉 Purchase Complete!',
-                `${item.name}\n\n-${item.price} SOL\n+${reward} OASIS loyalty tokens\n\nTx: ${sig.substring(0, 16)}...`
+                '🎉 Order Placed!',
+                `${item.name} ordered from ${item.shopName}!\n\nA worker is preparing your order — the droid will deliver to Gate ${passengerGate}.\n\n+${reward} OASIS tokens earned\nTx: ${sig.substring(0, 16)}...`
             );
         } catch {
             Alert.alert('Transaction Failed', 'Please try again.');
