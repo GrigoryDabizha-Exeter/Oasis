@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { generateMockArrivals } from '../services/flightApi';
+import { fetchLiveFlights } from '../services/liveFlightApi';
 import { FlightData, FlightType } from '../services/types';
 
 interface FlightStore {
@@ -9,12 +11,14 @@ interface FlightStore {
     isLoading: boolean;
     error: string | null;
     lastUpdated: string | null;
+    dataSource: 'live' | 'mock' | null;
     setDepartures: (flights: FlightData[]) => void;
     setArrivals: (flights: FlightData[]) => void;
     setSelectedFlight: (flight: FlightData | null) => void;
     setFlightType: (type: FlightType) => void;
     setLoading: (loading: boolean) => void;
     setError: (error: string | null) => void;
+    loadLiveFlights: () => Promise<void>;
 }
 
 export const useFlightStore = create<FlightStore>((set) => ({
@@ -25,10 +29,30 @@ export const useFlightStore = create<FlightStore>((set) => ({
     isLoading: false,
     error: null,
     lastUpdated: null,
+    dataSource: null,
     setDepartures: (flights) => set({ departures: flights, lastUpdated: new Date().toISOString() }),
     setArrivals: (flights) => set({ arrivals: flights, lastUpdated: new Date().toISOString() }),
     setSelectedFlight: (flight) => set({ selectedFlight: flight }),
     setFlightType: (type) => set({ flightType: type }),
     setLoading: (loading) => set({ isLoading: loading }),
     setError: (error) => set({ error }),
+
+    loadLiveFlights: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const result = await fetchLiveFlights();
+            set({
+                departures: result.departures,
+                dataSource: result.source,
+                isLoading: false,
+                lastUpdated: new Date().toISOString(),
+            });
+            // Also load mock arrivals (API only returns departures for LGW)
+            set({ arrivals: generateMockArrivals(15) });
+            console.log(`[FlightStore] Loaded ${result.departures.length} flights (source: ${result.source})`);
+        } catch (error) {
+            console.error('[FlightStore] loadLiveFlights failed:', error);
+            set({ isLoading: false, error: 'Failed to load flight data' });
+        }
+    },
 }));

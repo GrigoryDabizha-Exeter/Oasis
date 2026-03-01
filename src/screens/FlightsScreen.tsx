@@ -15,35 +15,34 @@ import HeroFlightCard from '../components/ui/HeroFlightCard';
 import HeroSearchConcierge from '../components/ui/HeroSearchConcierge';
 import PinUnlockModal from '../components/ui/PinUnlockModal';
 import RobotTrackerCard from '../components/ui/RobotTrackerCard';
-import { generateMockArrivals, generateMockDepartures } from '../services/flightApi';
 import { generateMockQueues } from '../services/queueApi';
 import { useFlightStore } from '../stores/useFlightStore';
 import { useQueueStore } from '../stores/useQueueStore';
 
 export default function FlightsScreen() {
-    const { departures, arrivals, flightType, setDepartures, setArrivals, setFlightType } = useFlightStore();
+    const { departures, arrivals, flightType, isLoading, dataSource, loadLiveFlights, setFlightType } = useFlightStore();
     const { queues, setQueues } = useQueueStore();
     const [refreshing, setRefreshing] = useState(false);
     const [showQueues, setShowQueues] = useState(false);
     const [pinModalVisible, setPinModalVisible] = useState(false);
 
-    const loadData = useCallback(() => {
-        setDepartures(generateMockDepartures(20));
-        setArrivals(generateMockArrivals(15));
-        setQueues(generateMockQueues());
-    }, []);
-
+    // Load live flights on mount and refresh queues
     useEffect(() => {
-        loadData();
-        const interval = setInterval(loadData, 60000);
+        loadLiveFlights();
+        setQueues(generateMockQueues());
+        const interval = setInterval(() => {
+            loadLiveFlights();
+            setQueues(generateMockQueues());
+        }, 60000);
         return () => clearInterval(interval);
-    }, [loadData]);
+    }, []);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        loadData();
-        setTimeout(() => setRefreshing(false), 500);
-    }, [loadData]);
+        await loadLiveFlights();
+        setQueues(generateMockQueues());
+        setRefreshing(false);
+    }, [loadLiveFlights]);
 
     const flights = flightType === 'departure' ? departures : arrivals;
 
@@ -64,6 +63,20 @@ export default function FlightsScreen() {
 
             {/* AI Concierge Search */}
             <HeroSearchConcierge />
+
+            {/* Live data status */}
+            {isLoading && (
+                <View style={styles.syncRow}>
+                    <Text style={styles.syncText}>⟳ Syncing Gatwick Radar...</Text>
+                </View>
+            )}
+            {!isLoading && dataSource && (
+                <View style={styles.syncRow}>
+                    <Text style={[styles.sourceTag, dataSource === 'live' && styles.sourceTagLive]}>
+                        {dataSource === 'live' ? '🛰 LIVE TELEMETRY' : '📡 SIMULATED'}
+                    </Text>
+                </View>
+            )}
 
             {/* Quick Stats */}
             <GlassCard elevated>
@@ -279,5 +292,27 @@ const styles = StyleSheet.create({
     },
     typeTextActive: {
         color: '#FFFFFF',
+    },
+    syncRow: {
+        alignItems: 'center',
+        marginBottom: 12,
+        marginTop: 4,
+    },
+    syncText: {
+        color: '#00A0B2',
+        fontSize: 12,
+        fontWeight: '600',
+        letterSpacing: 0.5,
+        opacity: 0.85,
+    },
+    sourceTag: {
+        color: 'rgba(255,255,255,0.45)',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+    },
+    sourceTagLive: {
+        color: '#4ADE80',
     },
 });

@@ -36,6 +36,10 @@ interface AviationStackFlight {
     };
 }
 
+function randomGate(): string {
+    return String(Math.floor(Math.random() * 46) + 10); // Gates 10–55
+}
+
 function mapApiFlightToLocal(apiFlight: AviationStackFlight, index: number): FlightData {
     const depTime = new Date(apiFlight.departure.scheduled);
     const delay = apiFlight.departure.delay ?? 0;
@@ -60,7 +64,7 @@ function mapApiFlightToLocal(apiFlight: AviationStackFlight, index: number): Fli
         departure: {
             iataCode: apiFlight.departure.iata,
             terminal: apiFlight.departure.terminal ?? 'South',
-            gate: apiFlight.departure.gate ?? null,
+            gate: apiFlight.departure.gate ?? randomGate(),
             scheduledTime: depTime.toTimeString().slice(0, 5),
             estimatedTime: apiFlight.departure.estimated
                 ? new Date(apiFlight.departure.estimated).toTimeString().slice(0, 5)
