@@ -1,4 +1,33 @@
+import { Platform } from 'react-native';
 import { FlightData } from './types';
+
+/**
+ * Resolve the correct fetch URL depending on the runtime environment:
+ *
+ *  • Native (iOS/Android) — direct HTTP fetch is fine; no browser enforces Mixed Content.
+ *  • Web on localhost       — HTTP dev server, so HTTP→HTTP fetch is allowed.
+ *  • Web on Vercel/prod    — HTTPS page, so the browser would block HTTP fetch.
+ *                            We proxy through our own Vercel serverless function instead.
+ */
+function getFlightsUrl(): string {
+    const direct = 'http://api.aviationstack.com/v1/flights?access_key=a85fd752a9b9aa6f638b8f99c9a47a8d&dep_iata=LGW';
+
+    if (Platform.OS !== 'web') return direct;
+
+    // Running in a browser — check whether we're on localhost or a real deployment.
+    if (typeof window !== 'undefined') {
+        const host = window.location.hostname;
+        const isLocal = host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.');
+        if (!isLocal) {
+            // Production web (Vercel): use same-origin API route — no CORS, no Mixed Content.
+            return '/api/flights';
+        }
+    }
+
+    // Localhost web dev: HTTP page → HTTP API is fine, but use corsproxy just in case the
+    // local dev server is ever served over HTTPS.
+    return 'https://corsproxy.io/?url=' + encodeURIComponent(direct);
+}
 
 function randomGate(): string {
     return String(Math.floor(Math.random() * 46) + 10);
@@ -77,9 +106,7 @@ export type FlightFetchResult =
 
 export async function fetchLiveFlights(): Promise<FlightFetchResult> {
     try {
-        const targetUrl = 'http://api.aviationstack.com/v1/flights?access_key=a85fd752a9b9aa6f638b8f99c9a47a8d&dep_iata=LGW';
-        const proxyUrl  = 'https://corsproxy.io/?url=' + encodeURIComponent(targetUrl);
-        const response  = await fetch(proxyUrl);
+        const response  = await fetch(getFlightsUrl());
         const data = await response.json();
 
         console.log('[LiveFlightAPI] RAW API RESPONSE (first 600 chars):', JSON.stringify(data).slice(0, 600));
