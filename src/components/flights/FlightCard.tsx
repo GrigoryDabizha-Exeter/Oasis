@@ -16,7 +16,6 @@ export default function FlightCard({ flight, type, onPress }: FlightCardProps) {
     const cityCode = isDeparture ? flight.arrival.iataCode : flight.departure.iataCode;
     const city = getCityName(cityCode);
     const time = isDeparture ? flight.departure.scheduledTime : flight.arrival.scheduledTime;
-    const formattedTime = new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const terminal = isDeparture ? flight.departure.terminal : flight.arrival.terminal;
     const gate = isDeparture ? flight.departure.gate : flight.arrival.gate;
     const hasDelay = flight.flight.delay && flight.flight.delay > 0;
@@ -57,7 +56,7 @@ export default function FlightCard({ flight, type, onPress }: FlightCardProps) {
                 <View style={styles.bottomRow}>
                     <View style={styles.infoChip}>
                         <Text style={styles.infoLabel}>TIME</Text>
-                        <Text style={[styles.infoValue, hasDelay && styles.delayed]}>{formattedTime}</Text>
+                        <Text style={[styles.infoValue, hasDelay ? styles.delayed : null]}>{time}</Text>
                     </View>
                     <View style={styles.infoChip}>
                         <Text style={styles.infoLabel}>TERMINAL</Text>

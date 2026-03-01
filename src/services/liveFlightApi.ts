@@ -40,8 +40,23 @@ function randomGate(): string {
     return String(Math.floor(Math.random() * 46) + 10); // Gates 10–55
 }
 
+/** Safely format an ISO date string to HH:mm, returning "TBD" if null/invalid */
+function safeTime(raw: string | null | undefined): string {
+    if (!raw) return 'TBD';
+    try {
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return 'TBD';
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch {
+        return 'TBD';
+    }
+}
+
+function randomTerminal(): string {
+    return Math.random() > 0.5 ? 'N' : 'S';
+}
+
 function mapApiFlightToLocal(apiFlight: AviationStackFlight, index: number): FlightData {
-    const depTime = new Date(apiFlight.departure.scheduled);
     const delay = apiFlight.departure.delay ?? 0;
 
     let status: FlightData['flight']['status'] = 'scheduled';
@@ -49,42 +64,38 @@ function mapApiFlightToLocal(apiFlight: AviationStackFlight, index: number): Fli
     else if (apiFlight.flight_status === 'landed') status = 'landed';
     else if (apiFlight.flight_status === 'cancelled') status = 'cancelled';
 
+    // Safe time extraction: prefer scheduled, fall back to estimated
+    const depScheduledRaw = apiFlight.departure.scheduled || apiFlight.departure.estimated;
+    const arrScheduledRaw = apiFlight.arrival.scheduled || apiFlight.arrival.estimated;
+
     return {
-        id: `live-${apiFlight.flight.iata}-${index}`,
+        id: `live-${apiFlight.flight.iata || apiFlight.flight.number}-${index}`,
         airline: {
-            name: apiFlight.airline.name,
-            iataCode: apiFlight.airline.iata,
+            name: apiFlight.airline.name || 'Unknown',
+            iataCode: apiFlight.airline.iata || '??',
         },
         flight: {
-            number: apiFlight.flight.number,
-            iataNumber: apiFlight.flight.iata,
+            number: apiFlight.flight.number || '—',
+            iataNumber: apiFlight.flight.iata || '—',
             status,
             delay,
         },
         departure: {
-            iataCode: apiFlight.departure.iata,
-            terminal: apiFlight.departure.terminal ?? 'South',
-            gate: apiFlight.departure.gate ?? randomGate(),
-            scheduledTime: depTime.toTimeString().slice(0, 5),
-            estimatedTime: apiFlight.departure.estimated
-                ? new Date(apiFlight.departure.estimated).toTimeString().slice(0, 5)
-                : null,
-            actualTime: apiFlight.departure.actual
-                ? new Date(apiFlight.departure.actual).toTimeString().slice(0, 5)
-                : null,
+            iataCode: apiFlight.departure.iata || 'LGW',
+            terminal: apiFlight.departure.terminal || randomTerminal(),
+            gate: apiFlight.departure.gate || randomGate(),
+            scheduledTime: safeTime(depScheduledRaw),
+            estimatedTime: safeTime(apiFlight.departure.estimated),
+            actualTime: safeTime(apiFlight.departure.actual),
         },
         arrival: {
-            iataCode: apiFlight.arrival.iata,
-            terminal: apiFlight.arrival.terminal ?? '',
+            iataCode: apiFlight.arrival.iata || '???',
+            terminal: apiFlight.arrival.terminal || '',
             gate: apiFlight.arrival.gate ?? null,
             baggage: null,
-            scheduledTime: new Date(apiFlight.arrival.scheduled).toTimeString().slice(0, 5),
-            estimatedTime: apiFlight.arrival.estimated
-                ? new Date(apiFlight.arrival.estimated).toTimeString().slice(0, 5)
-                : null,
-            actualTime: apiFlight.arrival.actual
-                ? new Date(apiFlight.arrival.actual).toTimeString().slice(0, 5)
-                : null,
+            scheduledTime: safeTime(arrScheduledRaw),
+            estimatedTime: safeTime(apiFlight.arrival.estimated),
+            actualTime: safeTime(apiFlight.arrival.actual),
         },
     };
 }
