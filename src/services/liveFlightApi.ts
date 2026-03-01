@@ -77,8 +77,9 @@ export type FlightFetchResult =
 
 export async function fetchLiveFlights(): Promise<FlightFetchResult> {
     try {
-        const url = 'http://api.aviationstack.com/v1/flights?access_key=a85fd752a9b9aa6f638b8f99c9a47a8d&dep_iata=LGW';
-        const response = await fetch(url);
+        const targetUrl = 'http://api.aviationstack.com/v1/flights?access_key=a85fd752a9b9aa6f638b8f99c9a47a8d&dep_iata=LGW';
+        const proxyUrl  = 'https://corsproxy.io/?url=' + encodeURIComponent(targetUrl);
+        const response  = await fetch(proxyUrl);
         const data = await response.json();
 
         console.log('[LiveFlightAPI] RAW API RESPONSE (first 600 chars):', JSON.stringify(data).slice(0, 600));
