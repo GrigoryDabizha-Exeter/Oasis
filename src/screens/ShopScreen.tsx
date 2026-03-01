@@ -13,6 +13,7 @@ import PinUnlockModal from '../components/ui/PinUnlockModal';
 import RobotTrackerCard from '../components/ui/RobotTrackerCard';
 import { useSolana } from '../providers/SolanaProvider';
 import { createOrder } from '../services/ordersApi';
+import { supabase } from '../services/supabaseClient';
 import { MOCK_SHOP_ITEMS, calculateLoyaltyReward } from '../services/shopService';
 import { ShopItem } from '../services/types';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -73,13 +74,25 @@ export default function ShopScreen() {
             const reward = calculateLoyaltyReward(item.price);
             setLoyaltyTokens(loyaltyTokens + reward);
 
-            // Dispatch order to the worker dashboard via the shared order store
-            createOrder({
+            // 1. Update local Zustand store (same-device worker sees it instantly)
+            const localOrder = createOrder({
                 item: item.name,
                 price: item.price,
                 shopName: item.shopName,
                 gate: passengerGate,
                 passengerName: user?.name ?? 'Passenger',
+            });
+
+            // 2. Persist to Supabase (cross-device realtime sync)
+            supabase.from('orders').insert([{
+                item: localOrder.item,
+                passenger_name: localOrder.passengerName,
+                status: 'pending',
+                gate: localOrder.gate,
+                shop_name: localOrder.shopName,
+                price: localOrder.price,
+            }]).then((result: { error: { message: string } | null }) => {
+                if (result.error) console.warn('[Supabase] Order insert failed:', result.error.message);
             });
 
             Alert.alert(

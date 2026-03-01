@@ -17,12 +17,14 @@ import Animated, {
     withSequence,
     withTiming,
 } from 'react-native-reanimated';
+import { SupabaseOrder, supabase } from '../services/supabaseClient';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useOrderStore } from '../stores/useOrderStore';
 import { glassStyles } from '../theme/glassStyles';
 import { borderRadius, colors, spacing, typography } from '../theme/tokens';
 
 type VendorOrderStatus = 'new' | 'droid_arriving' | 'loading' | 'dispatched';
+type CloudStatus = 'connecting' | 'live' | 'error';
 
 export default function VendorDashboardScreen() {
     const user = useAuthStore((s) => s.user);
@@ -31,11 +33,14 @@ export default function VendorDashboardScreen() {
     const { clearSession } = useAuth0();
 
     const activeOrder = useOrderStore((s) => s.activeOrder);
+    const placeOrder  = useOrderStore((s) => s.placeOrder);
     const setOrderStatus = useOrderStore((s) => s.setOrderStatus);
     const clearOrder = useOrderStore((s) => s.clearOrder);
 
     const [vendorStatus, setVendorStatus] = useState<VendorOrderStatus>('new');
     const [droidTimer, setDroidTimer] = useState<number>(0);
+    const [cloudStatus, setCloudStatus] = useState<CloudStatus>('connecting');
+    const [queuedOrders, setQueuedOrders] = useState<SupabaseOrder[]>([]);
 
     // Check if order matches this shop
     const hasOrder = activeOrder && activeOrder.shopName === shopName && activeOrder.status === 'preparing';
@@ -68,6 +73,73 @@ export default function VendorDashboardScreen() {
             return () => clearInterval(interval);
         }
     }, [vendorStatus]);
+
+    // ── Supabase realtime subscription ───────────────────────────────────────
+    useEffect(() => {
+        // Fetch any pending orders that already exist in the DB
+        const loadExisting = async () => {
+            const { data, error } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('status', 'pending')
+                .order('created_at', { ascending: true });
+
+            if (error) { setCloudStatus('error'); return; }
+
+            const relevant = (data ?? []).filter(
+                (o: SupabaseOrder) => !shopName || o.shop_name === shopName
+            );
+
+            if (relevant.length > 0 && !useOrderStore.getState().activeOrder) {
+                const first = relevant[0];
+                placeOrder(
+                    first.item,
+                    first.gate ?? 'TBD',
+                    first.price ?? 0,
+                    first.shop_name ?? shopName ?? 'Shop',
+                    first.passenger_name ?? 'Passenger',
+                );
+                setQueuedOrders(relevant.slice(1));
+            } else {
+                setQueuedOrders(relevant);
+            }
+        };
+
+        loadExisting();
+
+        // Subscribe to new inserts in real-time
+        const channel = supabase
+            .channel('vendor-orders')
+            .on(
+                'postgres_changes' as const,
+                { event: 'INSERT', schema: 'public', table: 'orders' },
+                (payload: { new: SupabaseOrder }) => {
+                    const incoming = payload.new;
+                    if (shopName && incoming.shop_name !== shopName) return;
+
+                    if (!useOrderStore.getState().activeOrder) {
+                        placeOrder(
+                            incoming.item,
+                            incoming.gate ?? 'TBD',
+                            incoming.price ?? 0,
+                            incoming.shop_name ?? shopName ?? 'Shop',
+                            incoming.passenger_name ?? 'Passenger',
+                        );
+                    } else {
+                        setQueuedOrders((prev) => [incoming, ...prev]);
+                    }
+                }
+            )
+            .subscribe((status: string) => {
+                setCloudStatus(
+                    status === 'SUBSCRIBED'     ? 'live'
+                    : status === 'CHANNEL_ERROR' ? 'error'
+                    : 'connecting'
+                );
+            });
+
+        return () => { supabase.removeChannel(channel); };
+    }, [shopName]);
 
     // Pulsing live dot
     const pulseOpacity = useSharedValue(1);
@@ -134,13 +206,37 @@ export default function VendorDashboardScreen() {
                             Hey, {user?.name?.split(' ')[0] ?? 'Partner'} 👋
                         </Text>
                     </View>
-                    <TouchableOpacity
-                        style={styles.logoutBtn}
-                        onPress={handleLogout}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={styles.logoutText}>Sign Out</Text>
-                    </TouchableOpacity>
+                    <View style={styles.headerRight}>
+                        {/* Live from Cloud badge */}
+                        <View style={[
+                            styles.cloudBadge,
+                            cloudStatus === 'live'        && styles.cloudBadgeLive,
+                            cloudStatus === 'error'       && styles.cloudBadgeError,
+                            cloudStatus === 'connecting'  && styles.cloudBadgeConnecting,
+                        ]}>
+                            <View style={[
+                                styles.cloudDot,
+                                cloudStatus === 'live'       && { backgroundColor: '#22C55E' },
+                                cloudStatus === 'error'      && { backgroundColor: '#EF4444' },
+                                cloudStatus === 'connecting' && { backgroundColor: '#F59E0B' },
+                            ]} />
+                            <Text style={[
+                                styles.cloudBadgeText,
+                                cloudStatus === 'live'       && { color: '#22C55E' },
+                                cloudStatus === 'error'      && { color: '#EF4444' },
+                                cloudStatus === 'connecting' && { color: '#F59E0B' },
+                            ]}>
+                                {cloudStatus === 'live' ? '☁ LIVE' : cloudStatus === 'error' ? '☁ OFFLINE' : '☁ SYNC…'}
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.logoutBtn}
+                            onPress={handleLogout}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.logoutText}>Sign Out</Text>
+                        </TouchableOpacity>
+                    </View>
                 </Animated.View>
 
                 {/* Stats */}
@@ -541,5 +637,48 @@ const styles = StyleSheet.create({
         ...typography.caption,
         color: colors.text.secondary,
         flex: 1,
+    },
+
+    // Header right cluster
+    headerRight: {
+        alignItems: 'flex-end',
+        gap: spacing.xs,
+    },
+
+    // Cloud status badge
+    cloudBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: borderRadius.full,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    cloudBadgeLive: {
+        backgroundColor: 'rgba(34,197,94,0.1)',
+        borderColor: 'rgba(34,197,94,0.3)',
+    },
+    cloudBadgeConnecting: {
+        backgroundColor: 'rgba(245,158,11,0.1)',
+        borderColor: 'rgba(245,158,11,0.3)',
+    },
+    cloudBadgeError: {
+        backgroundColor: 'rgba(239,68,68,0.1)',
+        borderColor: 'rgba(239,68,68,0.3)',
+    },
+    cloudDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+    },
+    cloudBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        color: 'rgba(255,255,255,0.4)',
     },
 });
