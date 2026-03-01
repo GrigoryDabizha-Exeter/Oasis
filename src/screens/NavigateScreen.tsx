@@ -7,16 +7,19 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import LeafletMap from '../components/map/LeafletMap';
 import GlassCard from '../components/ui/GlassCard';
 import HeroSearchConcierge from '../components/ui/HeroSearchConcierge';
 import { GateInfo, NavigationRoute } from '../services/types';
 import { getNearbyPOIs, getRoute } from '../services/wayfindingService';
 
-type AccessibilityMode = 'standard' | 'wheelchair' | 'visually-impaired';
+const TERMINAL_COORDS: Record<'North' | 'South', [number, number]> = {
+    North: [51.1512, -0.1635],
+    South: [51.1537, -0.1821],
+};
 
 export default function NavigateScreen() {
     const [selectedTerminal, setSelectedTerminal] = useState<'North' | 'South'>('North');
-    const [accessibilityMode, setAccessibilityMode] = useState<AccessibilityMode>('standard');
     const [selectedDestination, setSelectedDestination] = useState<GateInfo | null>(null);
     const [route, setRoute] = useState<NavigationRoute | null>(null);
     const [isNavigating, setIsNavigating] = useState(false);
@@ -33,16 +36,10 @@ export default function NavigateScreen() {
     const handleNavigate = (poi: GateInfo) => {
         setSelectedDestination(poi);
         const fromId = selectedTerminal === 'North' ? 'security-north' : 'security-south';
-        const newRoute = getRoute(fromId, poi.id, accessibilityMode);
+        const newRoute = getRoute(fromId, poi.id, 'standard');
         setRoute(newRoute);
         setIsNavigating(true);
     };
-
-    const accessibilityOptions: { mode: AccessibilityMode; icon: string; label: string }[] = [
-        { mode: 'standard', icon: '🚶', label: 'Standard' },
-        { mode: 'wheelchair', icon: '♿', label: 'Step-Free' },
-        { mode: 'visually-impaired', icon: '🦯', label: 'Audio Guide' },
-    ];
 
     const getTypeIcon = (type: GateInfo['type']) => {
         const icons: Record<string, string> = {
@@ -56,9 +53,9 @@ export default function NavigateScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <Text style={styles.label}>INDOOR NAVIGATION</Text>
+                    <Text style={styles.label}>LIVE TERMINAL MAP</Text>
                     <Text style={styles.title}>Navigate</Text>
-                    <Text style={styles.subtitle}>LiDAR-powered wayfinding • 3ft accuracy</Text>
+                    <Text style={styles.subtitle}>London Gatwick Airport • OpenStreetMap</Text>
                     <View style={{ marginTop: 16 }}>
                         <HeroSearchConcierge />
                     </View>
@@ -74,23 +71,6 @@ export default function NavigateScreen() {
                         >
                             <Text style={[styles.terminalText, selectedTerminal === t && styles.terminalTextActive]}>
                                 Terminal {t}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Accessibility Mode */}
-                <View style={styles.accessRow}>
-                    {accessibilityOptions.map(({ mode, icon, label }) => (
-                        <TouchableOpacity
-                            key={mode}
-                            style={[styles.accessBtn, accessibilityMode === mode && styles.accessBtnActive]}
-                            onPress={() => setAccessibilityMode(mode)}
-                            accessibilityLabel={`${label} routing mode`}
-                        >
-                            <Text style={styles.accessIcon}>{icon}</Text>
-                            <Text style={[styles.accessLabel, accessibilityMode === mode && styles.accessLabelActive]}>
-                                {label}
                             </Text>
                         </TouchableOpacity>
                     ))}
@@ -137,28 +117,26 @@ export default function NavigateScreen() {
                     </GlassCard>
                 )}
 
-                {/* Map Placeholder */}
+                {/* Live Map */}
                 {!isNavigating && (
-                    <GlassCard style={styles.mapPlaceholder}>
-                        <View style={styles.mapInner}>
-                            <Text style={styles.mapIcon}>🗺️</Text>
-                            <Text style={styles.mapText}>Mapbox IMDF Indoor Map</Text>
-                            <Text style={styles.mapSubtext}>Terminal {selectedTerminal} • Floor 1</Text>
-                            <View style={styles.mapGrid}>
-                                {gates.concat(amenities).slice(0, 6).map((poi) => (
-                                    <TouchableOpacity
-                                        key={poi.id}
-                                        style={styles.mapPin}
-                                        onPress={() => handleNavigate(poi)}
-                                        accessibilityLabel={`Navigate to ${poi.name}`}
-                                    >
-                                        <Text style={styles.mapPinIcon}>{getTypeIcon(poi.type)}</Text>
-                                        <Text style={styles.mapPinLabel}>{poi.name}</Text>
-                                    </TouchableOpacity>
-                                ))}
+                    <View style={styles.mapSection}>
+                        <View style={styles.mapCard}>
+                            <View style={styles.mapCardHeader}>
+                                <View style={styles.mapLiveDot} />
+                                <Text style={styles.mapCardTitle}>
+                                    Gatwick Airport · Terminal {selectedTerminal}
+                                </Text>
                             </View>
+                            <LeafletMap
+                                key={selectedTerminal}
+                                center={TERMINAL_COORDS[selectedTerminal]}
+                                zoom={15}
+                            />
+                            <Text style={styles.mapHint}>
+                                Tap a marker to see details · Pinch or scroll to zoom
+                            </Text>
                         </View>
-                    </GlassCard>
+                    </View>
                 )}
 
                 {/* Destination List */}
@@ -213,15 +191,6 @@ const styles = StyleSheet.create({
     terminalBtnActive: { backgroundColor: 'rgba(0, 160, 178, 0.12)', borderColor: 'rgba(0, 160, 178, 0.3)' },
     terminalText: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: '600' },
     terminalTextActive: { color: '#00A0B2' },
-    accessRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 20 },
-    accessBtn: {
-        flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    },
-    accessBtnActive: { backgroundColor: 'rgba(0, 160, 178, 0.12)', borderColor: 'rgba(0, 160, 178, 0.3)' },
-    accessIcon: { fontSize: 20, marginBottom: 4 },
-    accessLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '600' },
-    accessLabelActive: { color: '#00A0B2' },
     routeCard: { marginHorizontal: 16, marginBottom: 16 },
     routeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
     routeTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
@@ -237,15 +206,40 @@ const styles = StyleSheet.create({
     stepContent: { flex: 1, paddingLeft: 12, paddingBottom: 12 },
     stepInstruction: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', lineHeight: 20 },
     stepDistance: { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 2 },
-    mapPlaceholder: { marginHorizontal: 16, marginBottom: 20 },
-    mapInner: { alignItems: 'center', paddingVertical: 24 },
-    mapIcon: { fontSize: 48, marginBottom: 12 },
-    mapText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-    mapSubtext: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4, marginBottom: 24 },
-    mapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
-    mapPin: { alignItems: 'center', width: 80 },
-    mapPinIcon: { fontSize: 24, marginBottom: 4 },
-    mapPinLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 10, textAlign: 'center' },
+    mapSection: { paddingHorizontal: 16, marginBottom: 20 },
+    mapCard: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 20,
+        overflow: 'hidden',
+        padding: 12,
+    },
+    mapCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 10,
+        paddingHorizontal: 2,
+    },
+    mapLiveDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: '#22C55E',
+        shadowColor: '#22C55E',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 4,
+    },
+    mapCardTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+    mapHint: {
+        color: 'rgba(255,255,255,0.3)',
+        fontSize: 11,
+        textAlign: 'center',
+        marginTop: 8,
+        paddingHorizontal: 4,
+    },
     sectionTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', paddingHorizontal: 16, marginBottom: 12, marginTop: 4 },
     destinationGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8, marginBottom: 20 },
     destChip: {
