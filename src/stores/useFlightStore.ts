@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
 import { FlightData, FlightType } from '../services/types';
 
 interface FlightStore {
@@ -18,30 +17,18 @@ interface FlightStore {
     setError: (error: string | null) => void;
 }
 
-export const useFlightStore = create<FlightStore>()(
-    persist(
-        (set) => ({
-            departures: [],
-            arrivals: [],
-            selectedFlight: null,
-            flightType: 'departure',
-            isLoading: false,
-            error: null,
-            lastUpdated: null,
-            setDepartures: (flights) => set({ departures: flights, lastUpdated: new Date().toISOString() }),
-            setArrivals: (flights) => set({ arrivals: flights, lastUpdated: new Date().toISOString() }),
-            setSelectedFlight: (flight) => set({ selectedFlight: flight }),
-            setFlightType: (type) => set({ flightType: type }),
-            setLoading: (loading) => set({ isLoading: loading }),
-            setError: (error) => set({ error }),
-        }),
-        {
-            name: 'oasis-flight-store',
-            storage: createJSONStorage(() => localStorage),
-            partialize: (state) => ({
-                selectedFlight: state.selectedFlight,
-                flightType: state.flightType,
-            }),
-        }
-    )
-);
+export const useFlightStore = create<FlightStore>((set) => ({
+    departures: [],
+    arrivals: [],
+    selectedFlight: null,
+    flightType: 'departure',
+    isLoading: false,
+    error: null,
+    lastUpdated: null,
+    setDepartures: (flights) => set({ departures: flights, lastUpdated: new Date().toISOString() }),
+    setArrivals: (flights) => set({ arrivals: flights, lastUpdated: new Date().toISOString() }),
+    setSelectedFlight: (flight) => set({ selectedFlight: flight }),
+    setFlightType: (type) => set({ flightType: type }),
+    setLoading: (loading) => set({ isLoading: loading }),
+    setError: (error) => set({ error }),
+}));
