@@ -5,6 +5,19 @@ import { FlightData } from '../../services/types';
 import GlassCard from '../ui/GlassCard';
 import StatusChip from '../ui/StatusChip';
 
+function formatTime(raw: string): string {
+    if (!raw) return 'TBD';
+    // Already HH:mm — pass through
+    if (/^\d{2}:\d{2}$/.test(raw)) return raw;
+    try {
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return 'TBD';
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch {
+        return 'TBD';
+    }
+}
+
 interface FlightCardProps {
     flight: FlightData;
     type: 'departure' | 'arrival';
@@ -56,7 +69,7 @@ export default function FlightCard({ flight, type, onPress }: FlightCardProps) {
                 <View style={styles.bottomRow}>
                     <View style={styles.infoChip}>
                         <Text style={styles.infoLabel}>TIME</Text>
-                        <Text style={[styles.infoValue, hasDelay ? styles.delayed : null]}>{time}</Text>
+                        <Text style={[styles.infoValue, hasDelay ? styles.delayed : null]}>{formatTime(time)}</Text>
                     </View>
                     <View style={styles.infoChip}>
                         <Text style={styles.infoLabel}>TERMINAL</Text>

@@ -9,7 +9,6 @@ import {
     View,
 } from 'react-native';
 import ShopItemCard from '../components/shop/ShopItemCard';
-import GlassCard from '../components/ui/GlassCard';
 import PinUnlockModal from '../components/ui/PinUnlockModal';
 import RobotTrackerCard from '../components/ui/RobotTrackerCard';
 import { useSolana } from '../providers/SolanaProvider';
@@ -81,22 +80,6 @@ export default function ShopScreen() {
             {/* Droid Delivery Tracker */}
             <RobotTrackerCard onPinPress={() => setPinModalVisible(true)} />
 
-            {/* Tip Porter Banner */}
-            <GlassCard elevated highlight style={styles.tipBanner}>
-                <View style={styles.tipRow}>
-                    <View style={styles.tipInfo}>
-                        <Text style={styles.tipTitle}>💰 Tip Your Porter</Text>
-                        <Text style={styles.tipSub}>Scan a porter's QR code for instant SOL tipping</Text>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.scanBtn}
-                        onPress={() => Alert.alert('QR Scanner', 'Camera would open to scan porter QR code')}
-                    >
-                        <Text style={styles.scanBtnText}>📷 Scan</Text>
-                    </TouchableOpacity>
-                </View>
-            </GlassCard>
-
             {/* Category Filter */}
             <View style={styles.categoryRow}>
                 {categories.map(({ key, label, icon }) => (
@@ -141,17 +124,6 @@ const styles = StyleSheet.create({
     label: { color: '#00A0B2', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 4 },
     title: { color: '#FFFFFF', fontSize: 36, fontWeight: '800', letterSpacing: -1 },
     subtitle: { color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 },
-    tipBanner: { marginBottom: 16 },
-    tipRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    tipInfo: { flex: 1 },
-    tipTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', marginBottom: 4 },
-    tipSub: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
-    scanBtn: {
-        backgroundColor: 'rgba(0, 160, 178, 0.15)',
-        paddingHorizontal: 14, paddingVertical: 8,
-        borderRadius: 10, borderWidth: 1, borderColor: 'rgba(0, 160, 178, 0.3)',
-    },
-    scanBtnText: { color: '#00A0B2', fontSize: 13, fontWeight: '600' },
     categoryRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
     categoryBtn: {
         flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
